@@ -12,8 +12,8 @@ The Crop & Afforestation Recommendation AI Bot is a Streamlit-based Python appli
 ## Installation
 1. Clone the repository:
    ```
-   git clone https://github.com/yourusername/crop_recommendation-ai-bot.git
-   cd crop_recommendation-ai-bot
+   git clone https://github.com/yourusername/crop_recommendation_ai.git
+   cd crop_recommendation_ai
    ```
 
 2. Create a virtual environment (optional but recommended):
