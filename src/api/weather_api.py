@@ -4,6 +4,51 @@ from dotenv import load_dotenv
 
 load_dotenv()
 
+def calculate_aqi_from_pm25(pm25_concentration):
+    """
+    Calculate US EPA AQI from PM2.5 concentration (μg/m³)
+    Based on official EPA AQI calculation formula
+    """
+    # EPA AQI breakpoints for PM2.5 (24-hour average)
+    breakpoints = [
+        (0.0, 12.0, 0, 50),       # Good
+        (12.1, 35.4, 51, 100),    # Moderate  
+        (35.5, 55.4, 101, 150),   # Unhealthy for Sensitive Groups
+        (55.5, 150.4, 151, 200),  # Unhealthy
+        (150.5, 250.4, 201, 300), # Very Unhealthy
+        (250.5, 350.4, 301, 400), # Hazardous
+        (350.5, 500.4, 401, 500)  # Hazardous
+    ]
+    
+    # Find the appropriate breakpoint
+    for low_conc, high_conc, low_aqi, high_aqi in breakpoints:
+        if low_conc <= pm25_concentration <= high_conc:
+            # Linear interpolation formula
+            aqi = ((high_aqi - low_aqi) / (high_conc - low_conc)) * (pm25_concentration - low_conc) + low_aqi
+            return round(aqi)
+    
+    # If concentration is higher than the highest breakpoint
+    if pm25_concentration > 500.4:
+        return 500  # Maximum AQI
+    
+    # Default fallback
+    return 50
+
+def get_aqi_category(aqi_value):
+    """Get AQI category name based on AQI value"""
+    if aqi_value <= 50:
+        return "Good"
+    elif aqi_value <= 100:
+        return "Moderate"
+    elif aqi_value <= 150:
+        return "Unhealthy for Sensitive Groups"
+    elif aqi_value <= 200:
+        return "Unhealthy"
+    elif aqi_value <= 300:
+        return "Very Unhealthy"
+    else:
+        return "Hazardous"
+
 def get_weather_data(lat, lon):
     """
     Fetch weather and air quality data from OpenWeatherMap
@@ -44,13 +89,21 @@ def get_weather_data(lat, lon):
         rainfall_value = get_rainfall_estimate(lat, lon)
         climate_type_value = get_climate_type(lat, lon)
         
+        # Get air quality data
+        openweather_aqi = air_data['list'][0]['main']['aqi']  # 1-5 scale
+        pm2_5_value = air_data['list'][0]['components'].get('pm2_5', 0)
+        
+        # Calculate US EPA AQI from PM2.5 concentration
+        calculated_aqi = calculate_aqi_from_pm25(pm2_5_value)
+        
         climate_info = {
             'temperature': weather_data['main']['temp'],
             'humidity': weather_data['main']['humidity'],
             'rainfall': rainfall_value,
             'climate_type': climate_type_value,
-            'aqi': air_data['list'][0]['main']['aqi'],
-            'pm2_5': air_data['list'][0]['components'].get('pm2_5', 0),
+            'aqi': calculated_aqi,  # Use calculated AQI (0-500 scale)
+            'aqi_rating': openweather_aqi,  # Keep original rating (1-5 scale)
+            'pm2_5': pm2_5_value,
             'location': f"{weather_data.get('name', 'Unknown')}, India",
             'status': 'success'
         }
@@ -201,7 +254,8 @@ def get_default_weather_data():
         'humidity': 65,
         'rainfall': 1000,
         'climate_type': 'tropical',
-        'aqi': 3,  # Moderate
+        'aqi': 75,  # Calculated AQI (0-500 scale)
+        'aqi_rating': 3,  # Moderate (1-5 scale)
         'pm2_5': 35,
         'location': 'India',
         'status': 'default_values'

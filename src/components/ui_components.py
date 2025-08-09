@@ -78,47 +78,95 @@ def create_sidebar_inputs():
     """
     return create_minimal_sidebar()
 
-def display_environmental_summary(env_data):
+def display_environmental_summary(env_data, user_preferences=None):
     """
-    Display environmental conditions summary
+    Display environmental conditions summary with user preference indicators
     """
     st.subheader("🌍 Environmental Conditions")
+    
+    # Show user preference context if available
+    if user_preferences:
+        preference_items = []
+        if user_preferences.get('soil_type'):
+            preference_items.append(f"👤 Soil: {user_preferences['soil_type']}")
+        if user_preferences.get('water_availability'):
+            preference_items.append(f"👤 Water: {user_preferences['water_availability']}")
+        if user_preferences.get('space_constraint'):
+            preference_items.append(f"👤 Space: {user_preferences['space_constraint']}")
+        
+        if preference_items:
+            st.info(f"📋 Your Preferences: {' • '.join(preference_items)}")
     
     col1, col2 = st.columns(2)
     
     with col1:
+        # Temperature from API
         st.metric(
             "🌡️ Temperature",
             f"{env_data.get('temperature', 0):.1f}°C",
-            help="Current temperature"
+            help="Current temperature from weather API"
         )
+        
+        # Rainfall - show user preference indicator if overridden
+        rainfall_value = env_data.get('rainfall', 0)
+        rainfall_help = "Annual rainfall estimate"
+        if user_preferences and user_preferences.get('water_availability') in ['Limited', 'Abundant']:
+            rainfall_help += f" (👤 User preference: {user_preferences['water_availability']} water)"
+        
         st.metric(
             "🌧️ Rainfall",
-            f"{env_data.get('rainfall', 0)} mm/year",
-            help="Estimated annual rainfall"
+            f"{rainfall_value} mm/year",
+            help=rainfall_help
         )
+        
         st.metric(
             "💧 Humidity",
             f"{env_data.get('humidity', 0)}%",
-            help="Relative humidity"
+            help="Relative humidity from weather API"
         )
     
     with col2:
+        # Soil pH - show user preference indicator if specified  
+        soil_ph = env_data.get('soil_ph', 6.5)
+        soil_help = "Soil acidity/alkalinity"
+        if user_preferences and user_preferences.get('soil_type'):
+            soil_help += f" (👤 User soil type: {user_preferences['soil_type']})"
+        
         st.metric(
             "🌱 Soil pH",
-            f"{env_data.get('soil_ph', 0):.1f}",
-            help="Soil acidity/alkalinity"
+            f"{soil_ph:.1f}",
+            help=soil_help
         )
+        
+        # Air Quality - show actual AQI with rating in small text
+        aqi_value = env_data.get('aqi', 75)
+        aqi_rating = env_data.get('aqi_rating', 3)
+        
+        # Convert rating to text
+        rating_text = {1: "Good", 2: "Fair", 3: "Moderate", 4: "Poor", 5: "Very Poor"}
+        rating_display = rating_text.get(aqi_rating, "Moderate")
+        
         st.metric(
             "💨 Air Quality",
-            f"AQI {env_data.get('aqi', 0)}/5",
-            help="Air Quality Index (1=Good, 5=Very Poor)"
+            f"AQI {aqi_value}",
+            delta=f"{rating_display} ({aqi_rating}/5)",
+            help="Air Quality Index (EPA scale 0-500)"
         )
         st.metric(
             "🏠 PM2.5",
-            f"{env_data.get('pm2_5', 0)} μg/m³",
-            help="Fine particulate matter"
+            f"{env_data.get('pm2_5', 0):.1f} μg/m³",
+            help="Fine particulate matter concentration"
         )
+    
+    # Show space constraints if provided
+    if user_preferences and user_preferences.get('space_constraint'):
+        space_constraint = user_preferences['space_constraint']
+        if space_constraint == 'Small (Terrace/Balcony)':
+            st.info("🏠 **Space Optimization:** Recommendations tailored for terrace/balcony planting")
+        elif space_constraint == 'Medium (Small Garden)':
+            st.info("🌿 **Garden Planning:** Recommendations for small garden spaces")
+        elif space_constraint == 'Large (Farmland/Estate)':
+            st.info("🌳 **Large Scale:** Recommendations for extensive plantation projects")
 
 def display_recommendations(recommendations):
     """
@@ -161,11 +209,6 @@ def display_recommendations(recommendations):
     # Display individual plant cards
     for i, plant in enumerate(recommendations, 1):
         display_enhanced_plant_card(plant, i)
-    
-    # Add download section
-    st.markdown("---")
-    st.markdown("### 📊 Comprehensive Plantation Report")
-    st.info("💡 **Tip:** Use the visualizations and detailed plant cards above to plan your plantation strategy effectively!")
 
 def display_enhanced_plant_card(plant, index):
     """
@@ -432,9 +475,13 @@ def create_download_summary(recommendations, env_data):
     
     summary += "## Environmental Conditions\n"
     summary += f"- Temperature: {env_data.get('temperature', 0):.1f}°C\n"
-    summary += f"- Soil pH: {env_data.get('soil_ph', 0):.1f}\n"
+    summary += f"- Soil pH: {env_data.get('soil_ph', 6.5):.1f}\n"
     summary += f"- Rainfall: {env_data.get('rainfall', 0)} mm/year\n"
-    summary += f"- Air Quality: AQI {env_data.get('aqi', 0)}/5\n\n"
+    
+    # Handle new AQI format
+    aqi_value = env_data.get('aqi', 75)
+    aqi_rating = env_data.get('aqi_rating', 3)
+    summary += f"- Air Quality: AQI {aqi_value} ({aqi_rating}/5 rating)\n\n"
     
     summary += "## Recommended Plants\n\n"
     for i, plant in enumerate(recommendations, 1):

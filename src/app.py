@@ -14,7 +14,7 @@ from api.air_quality_api import get_air_quality_data
 from api.gemini_api import get_recommendations
 from utils.location_handler import get_lat_lon, validate_pin_code, get_location_name
 from utils.data_processor import format_data_for_ai, validate_environmental_data, get_data_quality_summary, create_environmental_summary
-from components.ui_components import create_minimal_sidebar, display_environmental_summary, display_recommendations, display_data_quality_info, create_download_summary
+from components.ui_components import create_minimal_sidebar, display_environmental_summary, display_recommendations, display_data_quality_info
 from components.styling import apply_custom_styles, create_app_header, create_loading_animation, show_loading_message, add_footer
 from components.map_interface import create_map_interface, get_location_from_map, create_location_summary
 from components.report_generator import create_comprehensive_report_download
@@ -150,19 +150,15 @@ def main():
                 )
             
             # Determine selected goal
-            user_goal = None
             goal_type = None
             
             if cash_crops:
-                user_goal = "commercial cash crop cultivation for maximum economic returns"
                 goal_type = "cash_crops"
                 st.session_state.selected_goal = "💰 Cash Crops"
             elif food_crops:
-                user_goal = "food crop cultivation for nutrition and food security"
                 goal_type = "food_crops" 
                 st.session_state.selected_goal = "🌾 Food Crops"
             elif afforestation:
-                user_goal = "afforestation and tree plantation for environmental benefits"
                 goal_type = "afforestation"
                 st.session_state.selected_goal = "🌳 Afforestation"
             
@@ -170,15 +166,12 @@ def main():
             if hasattr(st.session_state, 'selected_goal'):
                 st.success(f"Selected: {st.session_state.selected_goal}")
                 # Use the stored goal if no new selection
-                if not user_goal:
+                if not goal_type:
                     if st.session_state.selected_goal == "💰 Cash Crops":
-                        user_goal = "commercial cash crop cultivation for maximum economic returns"
                         goal_type = "cash_crops"
                     elif st.session_state.selected_goal == "🌾 Food Crops":
-                        user_goal = "food crop cultivation for nutrition and food security"
                         goal_type = "food_crops"
                     elif st.session_state.selected_goal == "🌳 Afforestation":
-                        user_goal = "afforestation and tree plantation for environmental benefits"
                         goal_type = "afforestation"
             
             prefer_native = st.checkbox(
@@ -300,8 +293,8 @@ def main():
             st.markdown("") # Spacer
             st.markdown("") # Spacer
             if st.button("🚀 Get Plant Recommendations", type="primary", use_container_width=True):
-                if user_goal and goal_type:
-                    generate_recommendations_from_coords(lat, lon, user_goal, goal_type, prefer_native)
+                if goal_type:
+                    generate_recommendations_from_coords(lat, lon, goal_type, prefer_native)
                 else:
                     st.warning("Please select your goal first!")
         
@@ -310,7 +303,7 @@ def main():
             display_results()
             
             # Add comprehensive report download
-            st.markdown("---")
+            # st.markdown("---")
             create_comprehensive_report_download(st.session_state.recommendations, st.session_state.env_data)
     
     else:
@@ -324,7 +317,7 @@ def main():
     # Add footer
     add_footer()
 
-def generate_recommendations_from_coords(lat, lon, user_goal, goal_type, prefer_native):
+def generate_recommendations_from_coords(lat, lon, goal_type, prefer_native):
     """
     Generate plant recommendations based on coordinates and goal type with user preferences
     """
@@ -346,89 +339,17 @@ def generate_recommendations_from_coords(lat, lon, user_goal, goal_type, prefer_
         # Get user preferences if available
         user_preferences = getattr(st.session_state, 'user_preferences', {})
         
-        # Format data for AI processing
+        # Format data for AI processing with user preferences
         formatted_data = format_data_for_ai(
             soil_data, 
             weather_data, 
             air_quality_data,
-            user_goal,
-            prefer_native
+            prefer_native,
+            user_preferences  # Pass user preferences to the enhanced function
         )
         
         # Add goal type to formatted data
         formatted_data['goal_type'] = goal_type
-        
-        # Override with user preferences where provided
-        if user_preferences:
-            # Water availability override - only if API data is unreliable or user specifically wants override
-            if user_preferences.get('water_availability', 'Auto-detect') != 'Auto-detect':
-                current_rainfall = formatted_data.get('rainfall', 1000)
-                water_mapping = {'Low': 400, 'Medium': 800, 'High': 1500}
-                user_preference_value = water_mapping.get(user_preferences['water_availability'])
-                
-                # Only override if the calculated rainfall seems unrealistic or user preference is very different
-                if user_preference_value and (current_rainfall < 100 or current_rainfall > 5000):
-                    formatted_data['rainfall'] = user_preference_value
-                    formatted_data['user_water_preference'] = user_preferences['water_availability']
-                    formatted_data['rainfall_override_reason'] = f"Calculated value ({current_rainfall}mm) seemed unrealistic, using user preference"
-                else:
-                    # Keep calculated value but note user preference for AI consideration
-                    formatted_data['user_water_preference'] = user_preferences['water_availability']
-                    formatted_data['user_preferred_rainfall'] = user_preference_value
-                    formatted_data['rainfall_note'] = f"Using calculated {current_rainfall}mm (user prefers {user_preferences['water_availability']} conditions)"
-            
-            # Soil type override
-            if user_preferences.get('soil_type_input', '').strip():
-                formatted_data['soil_texture'] = user_preferences['soil_type_input'].strip()
-                formatted_data['user_soil_input'] = True
-            
-            # Space availability and location type
-            final_space_area = user_preferences.get('space_availability', 0)
-            
-            # Convert area with units if provided
-            if user_preferences.get('area_with_units', '').strip():
-                from utils.data_processor import convert_area_to_square_meters
-                converted_area = convert_area_to_square_meters(user_preferences['area_with_units'])
-                if converted_area > 0:
-                    final_space_area = converted_area
-                    formatted_data['area_converted_from'] = user_preferences['area_with_units']
-            
-            if final_space_area > 0:
-                formatted_data['available_space'] = final_space_area
-            
-            # Space location type (e.g., balcony, window pane, backyard)
-            if user_preferences.get('space_location_type', '').strip():
-                formatted_data['space_location_type'] = user_preferences['space_location_type'].strip()
-                # Convert space type to standardized constraints
-                location_type = user_preferences['space_location_type'].lower().strip()
-                
-                # Add specific constraints based on location type
-                if any(word in location_type for word in ['window', 'pane', 'sill']):
-                    formatted_data['space_constraints'] = 'indoor_small'
-                    formatted_data['max_plant_height'] = '0.5 meters'
-                    formatted_data['container_suitable'] = True
-                elif any(word in location_type for word in ['balcony', 'terrace', 'patio']):
-                    formatted_data['space_constraints'] = 'semi_outdoor_medium'
-                    formatted_data['max_plant_height'] = '2 meters'
-                    formatted_data['container_suitable'] = True
-                elif any(word in location_type for word in ['backyard', 'garden', 'yard']):
-                    formatted_data['space_constraints'] = 'outdoor_medium'
-                    formatted_data['max_plant_height'] = '5 meters'
-                    formatted_data['container_suitable'] = False
-                elif any(word in location_type for word in ['farmland', 'field', 'farm', 'acre', 'hectare']):
-                    formatted_data['space_constraints'] = 'outdoor_large'
-                    formatted_data['max_plant_height'] = '15 meters'
-                    formatted_data['container_suitable'] = False
-                else:
-                    formatted_data['space_constraints'] = 'general'
-                    formatted_data['container_suitable'] = True
-            
-            # Budget preference
-            if user_preferences.get('budget_preference', 'Auto-suggest') != 'Auto-suggest':
-                formatted_data['budget_preference'] = user_preferences['budget_preference']
-            
-            # Add user preferences to formatted data for AI consideration
-            formatted_data['user_preferences'] = user_preferences
         
         # Validate and clean data
         formatted_data = validate_environmental_data(formatted_data)
@@ -440,7 +361,6 @@ def generate_recommendations_from_coords(lat, lon, user_goal, goal_type, prefer_
         with st.spinner("Generating AI-powered recommendations..."):
             recommendations = get_recommendations(
                 formatted_data,
-                user_goal,
                 prefer_native,
                 goal_type=goal_type,
                 lat=lat,
@@ -481,83 +401,16 @@ def generate_recommendations_from_coords(lat, lon, user_goal, goal_type, prefer_
         st.error(f"An error occurred: {str(e)}")
         st.error("Please try again or check your internet connection.")
 
-def generate_recommendations(user_inputs):
-    """
-    Generate plant recommendations based on user inputs
-    """
-    # Create loading animation
-    loading_placeholder = create_loading_animation()
-    
-    try:
-        show_loading_message(loading_placeholder, "Fetching environmental data...")
-        
-        # Get coordinates from location input
-        lat, lon = get_lat_lon(
-            user_inputs['location_input'], 
-            method=user_inputs['location_method'].lower().replace(" ", "_")
-        )
-        
-        if lat is None or lon is None:
-            loading_placeholder.empty()
-            st.error("Could not find coordinates for the provided location. Please try again.")
-            return
-        
-        # Get location name for display
-        location_name = get_location_name(lat, lon)
-        
-        # Fetch environmental data
-        with st.spinner("Analyzing environmental conditions..."):
-            soil_data = get_soil_data(lat, lon)
-            weather_data = get_weather_data(lat, lon)
-            air_quality_data = get_air_quality_data(lat, lon)
-        
-        # Format data for AI processing
-        formatted_data = format_data_for_ai(
-            soil_data, 
-            weather_data, 
-            air_quality_data,
-            user_inputs['user_goal'],
-            user_inputs['prefer_native']
-        )
-        
-        # Validate and clean data
-        formatted_data = validate_environmental_data(formatted_data)
-        
-        # Update location name
-        formatted_data['location'] = location_name
-        
-        # Get AI recommendations
-        with st.spinner("Generating AI-powered recommendations..."):
-            recommendations = get_recommendations(
-                formatted_data,
-                user_inputs['user_goal'],
-                user_inputs['prefer_native']
-            )
-        
-        loading_placeholder.empty()
-        
-        # Store results in session state
-        st.session_state.recommendations = recommendations
-        st.session_state.env_data = formatted_data
-        st.session_state.generation_date = datetime.now().strftime("%Y-%m-%d %H:%M")
-        
-        # Display success message
-        st.success(f"✅ Generated {len(recommendations)} recommendations for {location_name}")
-        
-    except Exception as e:
-        loading_placeholder.empty()
-        st.error(f"An error occurred: {str(e)}")
-        st.error("Please try again or check your internet connection.")
-
 def display_results():
     """
     Display the generated recommendations and environmental data
     """
     env_data = st.session_state.env_data
     recommendations = st.session_state.recommendations
+    user_preferences = st.session_state.get('user_preferences', {})
     
-    # Display environmental summary
-    display_environmental_summary(env_data)
+    # Display environmental summary with user preferences
+    display_environmental_summary(env_data, user_preferences)
     
     # Display data quality information
     quality_info = get_data_quality_summary(env_data)
@@ -565,16 +418,6 @@ def display_results():
     
     # Display recommendations
     display_recommendations(recommendations)
-    
-    # Add download button
-    if recommendations:
-        summary_text = create_download_summary(recommendations, env_data)
-        st.download_button(
-            label="📄 Download Recommendations (Markdown)",
-            data=summary_text,
-            file_name=f"plant_recommendations_{datetime.now().strftime('%Y%m%d_%H%M')}.md",
-            mime="text/markdown"
-        )
 
 def display_sample_recommendations():
     """

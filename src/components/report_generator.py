@@ -16,19 +16,41 @@ from pathlib import Path
 def extract_number_from_text(text):
     """
     Extract numeric value from text (e.g., "25 kg" -> 25)
+    Enhanced to handle more text formats and edge cases
     """
-    if not text:
+    if not text or text == 'N/A' or text == 'Unknown':
         return 25  # Default value
     
     import re
-    # Remove common prefixes and find numbers
-    text = str(text).lower()
+    # Convert to string and normalize
+    text = str(text).lower().strip()
+    
+    # Handle special non-numeric cases from AI responses
+    if any(phrase in text for phrase in ['not specified', 'not available', 'data not', 'unknown']):
+        return 25  # Default when data is missing
+    
+    # Handle qualitative descriptions
+    if 'excellent' in text or 'very high' in text:
+        return 40
+    elif 'high' in text or 'good' in text:
+        return 35
+    elif 'moderate' in text or 'medium' in text:
+        return 25
+    elif 'low' in text or 'poor' in text:
+        return 15
+    elif 'very low' in text:
+        return 10
     
     # Look for patterns like "25 kg", "about 30 liters", "approximately 20-25 kg"
     number_patterns = [
-        r'(\d+(?:\.\d+)?)\s*(?:kg|liters?|l)',  # "25 kg" or "30 liters"
-        r'(\d+(?:\.\d+)?)-(\d+(?:\.\d+)?)',     # "20-25" (take the first number)
-        r'(\d+(?:\.\d+)?)',                     # Any number
+        r'(\d+(?:\.\d+)?)\s*(?:kg|kilograms?|kilogram)',  # "25 kg" variations
+        r'(\d+(?:\.\d+)?)\s*(?:l|liters?|litres?|liter|litre)',  # "30 liters" variations
+        r'(\d+(?:\.\d+)?)\s*(?:m|meters?|metres?|meter|metre)',  # "5 meters" variations
+        r'(\d+(?:\.\d+)?)\s*(?:₹|rs\.?|rupees?)',  # "₹500" or "Rs 500"
+        r'(\d+(?:\.\d+)?)-(\d+(?:\.\d+)?)',     # "20-25" (take the average)
+        r'(\d+(?:\.\d+)?)\s*(?:to|or)\s*(\d+(?:\.\d+)?)',  # "20 to 25"
+        r'(?:about|approximately|around|roughly)\s*(\d+(?:\.\d+)?)',  # "about 25"
+        r'(\d+(?:\.\d+)?)',                     # Any standalone number
     ]
     
     for pattern in number_patterns:
@@ -37,10 +59,17 @@ def extract_number_from_text(text):
             # Take the first match and first group
             match = matches[0]
             if isinstance(match, tuple):
-                # For ranges like "20-25", take the first number
-                return int(float(match[0]))
+                # For ranges like "20-25", take the average
+                try:
+                    num1, num2 = float(match[0]), float(match[1])
+                    return int((num1 + num2) / 2)
+                except (ValueError, IndexError):
+                    return int(float(match[0]))
             else:
-                return int(float(match))
+                try:
+                    return int(float(match))
+                except ValueError:
+                    continue
     
     return 25  # Default fallback
 
@@ -124,10 +153,22 @@ def create_plant_visualizations(recommendations, env_data):
     Create interactive visualizations for the plant recommendations
     """
     if not recommendations:
+        st.warning("⚠️ No recommendations available for visualization. Please generate recommendations first.")
         return
+    
+    # Debug information (can be removed in production)
+    with st.expander("🔍 Debug Information", expanded=False):
+        st.write(f"**Number of recommendations:** {len(recommendations)}")
+        st.write("**Sample recommendation structure:**")
+        if recommendations:
+            st.json(recommendations[0])
     
     # Convert recommendations to DataFrame for easier plotting
     df = create_dataframe_from_recommendations(recommendations)
+    
+    if df.empty:
+        st.error("❌ Failed to process recommendation data for visualization.")
+        return
     
     st.markdown("### 📊 Plantation Analytics Dashboard")
     
@@ -148,22 +189,87 @@ def create_plant_visualizations(recommendations, env_data):
 
 def create_dataframe_from_recommendations(recommendations):
     """
-    Convert recommendations to pandas DataFrame
+    Convert recommendations to pandas DataFrame with enhanced data validation
     """
     data = []
     for plant in recommendations:
+        # Get plant basic info
+        scientific_name = plant.get('scientific_name', 'Unknown Plant')
+        plant_name = scientific_name[:20] + '...' if len(scientific_name) > 20 else scientific_name
+        
+        # Get air quality benefits with fallbacks
+        air_benefits = plant.get('air_quality_benefits', {})
+        co2_text = air_benefits.get('co2_absorption') or air_benefits.get('carbon_absorption') or '25 kg'
+        oxygen_text = air_benefits.get('oxygen_production') or air_benefits.get('o2_production') or '25 liters'
+        
+        # Get economic benefits with fallbacks
+        economic_benefits = plant.get('economic_benefits', {})
+        economics = plant.get('economics', {})  # Alternative key
+        plantation_guide = plant.get('plantation_guide', {})
+        
+        initial_cost_text = (economic_benefits.get('initial_cost') or 
+                           economics.get('initial_cost') or 
+                           plantation_guide.get('cost') or 
+                           '₹400')
+        
+        maintenance_cost_text = (economic_benefits.get('maintenance_cost_annual') or 
+                               economics.get('maintenance_cost') or 
+                               economic_benefits.get('annual_maintenance') or 
+                               '₹600')
+        
+        # Get growth characteristics with fallbacks
+        growth_chars = plant.get('growth_characteristics', {})
+        growth_info = plant.get('growth_info', {})  # Alternative key
+        
+        growth_rate = (growth_chars.get('growth_rate') or 
+                      growth_info.get('growth_rate') or 
+                      plant.get('growth_rate') or 
+                      'Medium')
+        
+        mature_height_text = (growth_chars.get('mature_height') or 
+                            growth_chars.get('height') or 
+                            growth_info.get('mature_height') or 
+                            plant.get('mature_height') or 
+                            '5 meters')
+        
+        space_req_text = (growth_chars.get('space_requirements') or 
+                         growth_chars.get('space_required') or 
+                         growth_info.get('space_requirements') or 
+                         plant.get('space_requirements') or 
+                         '3x3 meters')
+        
+        # Extract numeric values with validation
+        co2_value = extract_number_from_text(co2_text)
+        oxygen_value = extract_number_from_text(oxygen_text)
+        initial_cost = extract_number_from_text(initial_cost_text)
+        maintenance_cost = extract_number_from_text(maintenance_cost_text)
+        mature_height = extract_number_from_text(mature_height_text)
+        space_required = extract_number_from_text(space_req_text)
+        
+        # Validate environmental score
+        env_score = plant.get('environmental_impact_score')
+        if env_score is None or env_score == 'N/A':
+            env_score = 7.5
+        else:
+            try:
+                env_score = float(env_score)
+                if env_score < 0 or env_score > 10:
+                    env_score = 7.5
+            except (ValueError, TypeError):
+                env_score = 7.5
+        
         row = {
-            'Plant Name': plant.get('scientific_name', 'Unknown')[:20] + '...' if len(plant.get('scientific_name', 'Unknown')) > 20 else plant.get('scientific_name', 'Unknown'),
+            'Plant Name': plant_name,
             'Local Name': plant.get('local_name', 'N/A'),
-            'Type': plant.get('plant_type', 'N/A'),
-            'Environmental Score': plant.get('environmental_impact_score', 7.5),
-            'CO2 Absorption': extract_number_from_text(plant.get('air_quality_benefits', {}).get('co2_absorption', '25 kg')),
-            'Oxygen Production': extract_number_from_text(plant.get('air_quality_benefits', {}).get('oxygen_production', '25 liters')),
-            'Initial Cost': extract_number_from_text(plant.get('economic_benefits', {}).get('initial_cost', '₹400')),
-            'Annual Maintenance': extract_number_from_text(plant.get('economic_benefits', {}).get('maintenance_cost_annual', '₹600')),
-            'Growth Rate': plant.get('growth_characteristics', {}).get('growth_rate', 'Medium'),
-            'Mature Height': extract_number_from_text(plant.get('growth_characteristics', {}).get('mature_height', '8 meters')),
-            'Space Required': extract_number_from_text(plant.get('growth_characteristics', {}).get('space_requirements', '3x3 meters'))
+            'Type': plant.get('plant_type', 'Tree'),
+            'Environmental Score': env_score,
+            'CO2 Absorption': max(co2_value, 1),  # Ensure minimum value
+            'Oxygen Production': max(oxygen_value, 1),  # Ensure minimum value
+            'Initial Cost': max(initial_cost, 100),  # Ensure minimum value
+            'Annual Maintenance': max(maintenance_cost, 50),  # Ensure minimum value
+            'Growth Rate': growth_rate,
+            'Mature Height': max(mature_height, 1),  # Ensure minimum value
+            'Space Required': max(space_required, 1)  # Ensure minimum value
         }
         data.append(row)
     
@@ -171,57 +277,86 @@ def create_dataframe_from_recommendations(recommendations):
 
 def create_plant_overview_charts(df):
     """
-    Create overview charts for plant recommendations
+    Create overview charts for plant recommendations with improved data validation
     """
+    # Validate DataFrame
+    if df.empty:
+        st.warning("No plant data available for overview.")
+        return
+    
     col1, col2 = st.columns(2)
     
     with col1:
         # Environmental Score Radar Chart
-        fig_radar = go.Figure()
-        
-        fig_radar.add_trace(go.Scatterpolar(
-            r=df['Environmental Score'].tolist(),
-            theta=df['Plant Name'].tolist(),
-            fill='toself',
-            name='Environmental Impact',
-            line_color='green',
-            fillcolor='rgba(0, 150, 0, 0.3)'
-        ))
-        
-        fig_radar.update_layout(
-            polar=dict(
-                radialaxis=dict(
-                    visible=True,
-                    range=[0, 10]
-                )),
-            showlegend=True,
-            title="🌿 Environmental Impact Scores",
-            title_x=0.5,
-            height=400
-        )
-        
-        st.plotly_chart(fig_radar, use_container_width=True)
+        if 'Environmental Score' in df.columns and not df['Environmental Score'].empty:
+            # Ensure environmental scores are valid
+            df['Environmental Score'] = pd.to_numeric(df['Environmental Score'], errors='coerce').fillna(7.5)
+            
+            fig_radar = go.Figure()
+            
+            fig_radar.add_trace(go.Scatterpolar(
+                r=df['Environmental Score'].tolist(),
+                theta=df['Plant Name'].tolist(),
+                fill='toself',
+                name='Environmental Impact',
+                line_color='green',
+                fillcolor='rgba(0, 150, 0, 0.3)',
+                hovertemplate='<b>%{theta}</b><br>Environmental Score: %{r}/10<extra></extra>'
+            ))
+            
+            fig_radar.update_layout(
+                polar=dict(
+                    radialaxis=dict(
+                        visible=True,
+                        range=[0, 10]
+                    )),
+                showlegend=True,
+                title="🌿 Environmental Impact Scores",
+                title_x=0.5,
+                height=400
+            )
+            
+            st.plotly_chart(fig_radar, use_container_width=True)
+        else:
+            st.info("No environmental score data available.")
     
     with col2:
         # Plant Type Distribution
-        type_counts = df['Type'].value_counts()
-        
-        fig_pie = px.pie(
-            values=type_counts.values,
-            names=type_counts.index,
-            title="🌳 Plant Type Distribution",
-            color_discrete_sequence=['#2E8B57', '#90EE90', '#228B22', '#32CD32']
-        )
-        
-        fig_pie.update_traces(textposition='inside', textinfo='percent+label')
-        fig_pie.update_layout(height=400)
-        
-        st.plotly_chart(fig_pie, use_container_width=True)
+        if 'Type' in df.columns and not df['Type'].empty:
+            type_counts = df['Type'].value_counts()
+            
+            if not type_counts.empty:
+                fig_pie = px.pie(
+                    values=type_counts.values,
+                    names=type_counts.index,
+                    title="🌳 Plant Type Distribution",
+                    color_discrete_sequence=['#2E8B57', '#90EE90', '#228B22', '#32CD32']
+                )
+                
+                fig_pie.update_traces(textposition='inside', textinfo='percent+label')
+                fig_pie.update_layout(height=400)
+                
+                st.plotly_chart(fig_pie, use_container_width=True)
+            else:
+                st.info("No plant type data available.")
+        else:
+            st.info("No plant type data available.")
 
 def create_environmental_impact_charts(df):
     """
-    Create environmental impact visualizations
+    Create environmental impact visualizations with improved data validation
     """
+    # Validate DataFrame
+    if df.empty:
+        st.warning("No data available for environmental impact analysis.")
+        return
+    
+    # Ensure numeric columns are properly typed
+    numeric_columns = ['CO2 Absorption', 'Oxygen Production', 'Environmental Score']
+    for col in numeric_columns:
+        if col in df.columns:
+            df[col] = pd.to_numeric(df[col], errors='coerce').fillna(25)
+    
     # Air Quality Benefits Comparison
     fig_air = make_subplots(
         rows=1, cols=2,
@@ -236,8 +371,9 @@ def create_environmental_impact_charts(df):
             y=df['CO2 Absorption'],
             name='CO2 Absorption',
             marker_color='darkgreen',
-            text=df['CO2 Absorption'],
-            textposition='auto'
+            text=[f"{val:.0f}" for val in df['CO2 Absorption']],
+            textposition='auto',
+            hovertemplate='<b>%{x}</b><br>CO2 Absorption: %{y} kg/year<extra></extra>'
         ),
         row=1, col=1
     )
@@ -249,8 +385,9 @@ def create_environmental_impact_charts(df):
             y=df['Oxygen Production'],
             name='Oxygen Production',
             marker_color='lightgreen',
-            text=df['Oxygen Production'],
-            textposition='auto'
+            text=[f"{val:.0f}" for val in df['Oxygen Production']],
+            textposition='auto',
+            hovertemplate='<b>%{x}</b><br>Oxygen Production: %{y} L/day<extra></extra>'
         ),
         row=1, col=2
     )
@@ -265,11 +402,11 @@ def create_environmental_impact_charts(df):
     
     st.plotly_chart(fig_air, use_container_width=True)
     
-    # Environmental Impact Summary Cards
+    # Environmental Impact Summary Cards with validation
     col1, col2, col3, col4 = st.columns(4)
     
     with col1:
-        total_co2 = df['CO2 Absorption'].sum()
+        total_co2 = max(df['CO2 Absorption'].sum(), 1)  # Ensure minimum value
         st.metric(
             label="🏭 Total CO2 Absorption",
             value=f"{total_co2:,.0f} kg/year",
@@ -277,7 +414,7 @@ def create_environmental_impact_charts(df):
         )
     
     with col2:
-        total_oxygen = df['Oxygen Production'].sum()
+        total_oxygen = max(df['Oxygen Production'].sum(), 1)  # Ensure minimum value
         st.metric(
             label="💨 Total Oxygen Production",
             value=f"{total_oxygen:,.0f} L/day",
@@ -286,10 +423,12 @@ def create_environmental_impact_charts(df):
     
     with col3:
         avg_env_score = df['Environmental Score'].mean()
+        if pd.isna(avg_env_score) or avg_env_score == 0:
+            avg_env_score = 7.5
         st.metric(
             label="📊 Avg Environmental Score",
             value=f"{avg_env_score:.1f}/10",
-            delta="Excellent sustainability rating"
+            delta="Excellent sustainability rating" if avg_env_score >= 7 else "Good sustainability rating"
         )
     
     with col4:
@@ -297,7 +436,7 @@ def create_environmental_impact_charts(df):
         st.metric(
             label="🌱 Total Plants",
             value=f"{total_plants}",
-            delta="Diverse ecosystem"
+            delta="Diverse ecosystem" if total_plants >= 5 else "Growing ecosystem"
         )
 
 def create_economic_analysis_charts(df):
@@ -363,7 +502,7 @@ def create_economic_analysis_charts(df):
         
         total_initial_cost = df['Initial Cost'].sum()
         total_annual_maintenance = df['Annual Maintenance'].sum()
-        cost_per_plant = total_initial_cost / len(df)
+        cost_per_plant = total_initial_cost / max(len(df), 1)  # Prevent division by zero
         
         st.metric("💰 Total Initial Investment", f"₹{total_initial_cost:,.0f}")
         st.metric("🔧 Total Annual Maintenance", f"₹{total_annual_maintenance:,.0f}")
@@ -375,57 +514,76 @@ def create_economic_analysis_charts(df):
 
 def create_growth_characteristics_charts(df):
     """
-    Create growth characteristics visualizations
+    Create growth characteristics visualizations with improved data validation
     """
+    # Validate DataFrame
+    if df.empty:
+        st.warning("No data available for growth characteristics analysis.")
+        return
+    
+    # Ensure numeric columns are properly typed
+    numeric_columns = ['Mature Height', 'Space Required']
+    for col in numeric_columns:
+        if col in df.columns:
+            df[col] = pd.to_numeric(df[col], errors='coerce').fillna(5)
+    
     # Growth Rate Distribution
     col1, col2 = st.columns(2)
     
     with col1:
         growth_counts = df['Growth Rate'].value_counts()
         
-        fig_growth = px.bar(
-            x=growth_counts.index,
-            y=growth_counts.values,
-            title="📈 Growth Rate Distribution",
-            color=growth_counts.values,
-            color_continuous_scale='Greens',
-            text=growth_counts.values
-        )
-        
-        fig_growth.update_traces(textposition='auto')
-        fig_growth.update_layout(
-            xaxis_title='Growth Rate',
-            yaxis_title='Number of Plants',
-            showlegend=False
-        )
-        
-        st.plotly_chart(fig_growth, use_container_width=True)
+        if not growth_counts.empty:
+            fig_growth = px.bar(
+                x=growth_counts.index,
+                y=growth_counts.values,
+                title="📈 Growth Rate Distribution",
+                color=growth_counts.values,
+                color_continuous_scale='Greens',
+                text=growth_counts.values
+            )
+            
+            fig_growth.update_traces(textposition='auto')
+            fig_growth.update_layout(
+                xaxis_title='Growth Rate',
+                yaxis_title='Number of Plants',
+                showlegend=False
+            )
+            
+            st.plotly_chart(fig_growth, use_container_width=True)
+        else:
+            st.info("No growth rate data available.")
     
     with col2:
         # Mature Height vs Space Requirements Scatter
-        fig_scatter = px.scatter(
-            df,
-            x='Space Required',
-            y='Mature Height',
-            size='Environmental Score',
-            color='Type',
-            hover_name='Plant Name',
-            title="🌳 Height vs Space Requirements",
-            labels={
-                'Space Required': 'Space Required (sq meters)',
-                'Mature Height': 'Mature Height (meters)'
-            }
-        )
-        
-        fig_scatter.update_layout(height=400)
-        st.plotly_chart(fig_scatter, use_container_width=True)
+        if len(df) > 0:
+            fig_scatter = px.scatter(
+                df,
+                x='Space Required',
+                y='Mature Height',
+                size='Environmental Score',
+                color='Type',
+                hover_name='Plant Name',
+                title="🌳 Height vs Space Requirements",
+                labels={
+                    'Space Required': 'Space Required (sq meters)',
+                    'Mature Height': 'Mature Height (meters)'
+                }
+            )
+            
+            fig_scatter.update_layout(height=400)
+            st.plotly_chart(fig_scatter, use_container_width=True)
+        else:
+            st.info("No height/space data available.")
     
     # Space Planning Visualization
     st.markdown("#### 🗺️ Space Planning Guide")
     
-    # Create a simple space planning grid
-    total_space = df['Space Required'].sum()
+    # Create metrics with validation
+    total_space = max(df['Space Required'].sum(), 1)
     avg_height = df['Mature Height'].mean()
+    if pd.isna(avg_height) or avg_height == 0:
+        avg_height = 5.0
     
     col1, col2, col3 = st.columns(3)
     
@@ -440,15 +598,15 @@ def create_growth_characteristics_charts(df):
         st.metric(
             label="📊 Average Mature Height",
             value=f"{avg_height:.1f} meters",
-            delta="Excellent canopy coverage"
+            delta="Excellent canopy coverage" if avg_height >= 8 else "Good canopy coverage"
         )
     
     with col3:
-        density = len(df) / total_space if total_space > 0 else 0
+        density = len(df) / max(total_space, 1)
         st.metric(
             label="🌱 Planting Density",
             value=f"{density:.3f} plants/sq meter",
-            delta="Optimal spacing"
+            delta="Optimal spacing" if density <= 0.5 else "Dense planting"
         )
 
 def generate_detailed_report(recommendations, env_data):
@@ -663,20 +821,6 @@ def generate_plant_section(plant, index):
 ---
 """
     return section
-
-def extract_number_from_text(text):
-    """
-    Extract numeric value from text (e.g., "25 kg" -> 25)
-    """
-    if not text:
-        return 0
-    
-    import re
-    # Extract number from text using regex
-    match = re.search(r'(\d+(?:\.\d+)?)', str(text))
-    if match:
-        return float(match.group(1))
-    return 0
 
 def generate_csv_summary(recommendations):
     """
