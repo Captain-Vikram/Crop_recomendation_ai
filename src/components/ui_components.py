@@ -265,7 +265,7 @@ def show_api_key_popup():
             <p>🌍 <strong>Why do I need API keys?</strong></p>
             <p>This app uses Google's Gemini AI to analyze your location's conditions and OpenWeatherMap 
             to get real-time weather, soil, and air quality data for accurate plant recommendations.</p>
-            <p1>🔒 <strong>Privacy:</strong> Your API keys stay in your browser and are never stored on your servers.</p1><br>
+            <p1>🔒 <strong>Privacy:</strong> Your API keys stay in your browser and are never stored on our servers.</p1><br>
             <p2> We do not store any personal information or API keys on our servers.</p2>
         </div>
         """, unsafe_allow_html=True)
@@ -827,3 +827,4 @@ def create_download_summary(recommendations, env_data):
         summary += f"**Analysis:** {plant.get('suitability_analysis', 'N/A')}\n\n"
     
     return summary
+
