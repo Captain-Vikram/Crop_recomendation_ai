@@ -48,7 +48,7 @@ def show_api_key_popup():
         # Gemini API Key Input
         st.markdown("#### 🤖 Gemini AI API Key")
         gemini_api_key = st.text_input(
-            "Gemini API Key",
+            "",
             type="password",
             placeholder="Paste your Gemini API key here... (e.g., AIzaSyA...)",
             help="Get your free API key from Google AI Studio",
@@ -60,7 +60,7 @@ def show_api_key_popup():
         # OpenWeatherMap API Key Input
         st.markdown("#### 🌤️ OpenWeatherMap API Key")
         weather_api_key = st.text_input(
-            "OpenWeatherMap API Key",
+            "",
             type="password",
             placeholder="Paste your OpenWeatherMap API key here... (e.g., a1b2c3d4...)",
             help="Get your free API key from OpenWeatherMap",
@@ -75,140 +75,49 @@ def show_api_key_popup():
             
             with tab1:
                 st.markdown("""
-                ### 🤖 Step-by-step guide for Gemini AI API:
+                ### Step-by-step guide for Gemini API:
                 
                 1. **Visit Google AI Studio** 
                    👉 Go to [aistudio.google.com](https://aistudio.google.com/)
                 
                 2. **Sign in with Google**
-                   🔐 Use your existing Gmail/Google account
-                   📧 Or create a new Google account if needed
+                   🔐 Use your Gmail account to log in
                 
-                3. **Accept Terms**
-                   📝 Accept the terms of service
-                   🌍 Select your country/region
-                
-                4. **Get API Key**
+                3. **Get API Key**
                    🔑 Click "Get API key" in the left sidebar
-                   📋 Or click the "Create API key" button
                    
-                5. **Create New Key**
-                   ➕ Click "Create API key in new project"
-                   🗂️ Or select an existing Google Cloud project
-                   ⚡ **Tip:** Creating in new project is easier!
+                4. **Create New Key**
+                   ➕ Click "Create API key in new project" or use existing project
                    
-                6. **Copy Your Key**
-                   📋 Copy the generated key (starts with "AIza...")
-                   🔒 Keep it secure and paste it above
+                5. **Copy & Paste**
+                   📋 Copy the generated key and paste it above
                 
-                **💰 Pricing:**
-                - ✅ **FREE tier:** Very generous limits
-                - 🔄 **No credit card** required to start
-                - 📊 **Perfect** for plant recommendations
-                
-                **🧠 What we use it for:**
-                - 🌱 Analyzing soil and climate data
-                - 🤖 Generating personalized plant recommendations
-                - 📖 Creating detailed care instructions
-                - 🌍 Environmental impact analysis
+                **✅ It's completely FREE with generous usage limits!**
                 """)
             
             with tab2:
                 st.markdown("""
-                ### 🌤️ Step-by-step guide for OpenWeatherMap API:
+                ### Step-by-step guide for OpenWeatherMap API:
                 
-                1. **Visit OpenWeatherMap Website** 
-                   👉 Go to [openweathermap.org](https://openweathermap.org/)
+                1. **Visit OpenWeatherMap** 
+                   👉 Go to [openweathermap.org/api](https://openweathermap.org/api)
+                
+                2. **Sign Up/Login**
+                   📝 Create a free account or log in
+                
+                3. **Get API Key**
+                   🔑 Go to "API keys" section in your account
                    
-                2. **Create Account**
-                   📝 Click "Sign Up" in the top right corner
-                   ✉️ Enter your email, username, and password
-                   📧 Verify your email address (check your inbox)
-                
-                3. **Sign In**
-                   🔐 Log in with your new account credentials
-                
-                4. **Access API Keys**
-                   🔑 Click on your username in the top right
-                   📋 Select "My API keys" from the dropdown menu
+                4. **Generate Key**
+                   ➕ Create a new API key (may take a few minutes to activate)
                    
-                5. **Generate API Key**
-                   ➕ You'll see a default API key already created
-                   🆕 Or click "Generate" to create a new one
-                   📝 Give it a name like "Plant Recommendation App"
-                   
-                6. **Activate & Wait**
-                   ⏰ **Important:** New API keys take 10-120 minutes to activate
-                   ⚡ Test your key after waiting
-                   
-                7. **Copy Your Key**
-                   📋 Copy the API key (32 characters long)
-                   🔒 Keep it secure and paste it above
+                5. **Copy & Paste**
+                   📋 Copy the generated key and paste it above
                 
-                **💰 Pricing:**
-                - ✅ **FREE tier:** 1,000 API calls/day
-                - ⚡ **Fast:** No credit card required
-                - 📊 **Perfect** for this plant recommendation app
-                
-                **🔍 What we use it for:**
-                - 🌡️ Real-time weather data
-                - 💨 Air quality information
-                - 🌧️ Rainfall patterns
-                - 🌍 Environmental conditions for your location
+                **✅ Free tier includes 1000 calls/day!**
                 """)
             
             st.markdown("**🔒 Security:** Your API keys are only stored in your browser session and never shared.")
-        
-        # Troubleshooting section
-        with st.expander("🔧 Troubleshooting & Common Issues", expanded=False):
-            st.markdown("""
-            ### 🚨 Common Problems & Solutions:
-            
-            **🤖 Gemini API Issues:**
-            - ❌ **"Invalid API key"** → Check if you copied the complete key
-            - ❌ **"API not enabled"** → Make sure you're signed into the correct Google account
-            - ❌ **"Quota exceeded"** → You've hit the free tier limit (very rare)
-            
-            **🌤️ OpenWeatherMap API Issues:**
-            - ❌ **"Invalid API key"** → Your key might not be activated yet (wait 10-120 minutes)
-            - ❌ **"API key not found"** → Double-check you copied the key correctly
-            - ❌ **"Call limit exceeded"** → You've used 1000+ calls today (resets at midnight UTC)
-            
-            **🔧 General Tips:**
-            - 📋 **Copy-paste carefully** - avoid extra spaces or missing characters
-            - 🔄 **Refresh the page** if you keep getting errors
-            - ⏰ **Wait for activation** - OpenWeatherMap keys need time to activate
-            - 🌐 **Check internet connection** - APIs require stable internet
-            
-            **💬 Still having issues?**
-            Make sure both API keys are correctly formatted:
-            - Gemini keys start with "AIza" and are ~39 characters long
-            - OpenWeatherMap keys are exactly 32 characters long
-            """)
-        
-        # API Key Format Examples
-        with st.expander("📝 API Key Format Examples", expanded=False):
-            st.markdown("""
-            ### ✅ Correct API Key Formats:
-            
-            **🤖 Gemini API Key:**
-            ```
-            AIzaSyDaGmWKa4JsXZ5iQCDhcGM8vVfbJt9QWxY
-            ```
-            *(39 characters, starts with "AIza")*
-            
-            **🌤️ OpenWeatherMap API Key:**
-            ```
-            a1b2c3d4e5f6789012345678901234ab
-            ```
-            *(32 characters, mix of letters and numbers)*
-            
-            **❌ Common Mistakes:**
-            - Extra spaces at beginning or end
-            - Missing characters when copying
-            - Copying the wrong text from the website
-            - Using old/revoked keys
-            """)
         
         st.markdown("---")
         
@@ -222,8 +131,8 @@ def show_api_key_popup():
                 weather_valid = weather_api_key and len(weather_api_key.strip()) > 20
                 
                 if gemini_valid and weather_valid:
-                    st.session_state.gemini_api_key = gemini_api_key.strip() if gemini_api_key else ""
-                    st.session_state.openweather_api_key = weather_api_key.strip() if weather_api_key else ""
+                    st.session_state.gemini_api_key = gemini_api_key.strip()
+                    st.session_state.openweather_api_key = weather_api_key.strip()
                     st.session_state.ai_model_choice = "🌐 Web AI (Gemini)"
                     st.success("✅ Both API keys saved successfully! Loading application...")
                     st.rerun()
@@ -235,28 +144,19 @@ def show_api_key_popup():
                     st.error("❌ Please enter a valid OpenWeatherMap API key")
         
         with col_b:
-            st.info("""
-            💡 **Important Notes:**
-            
-            🆓 Both API keys are **completely FREE**
-            
-            ⚡ **Gemini:** Ready immediately
-            
-            ⏰ **OpenWeatherMap:** Takes 10-120 minutes to activate after signup
-            
-            🔒 Your keys stay secure in your browser only
-            """)
-        
-        # API Key Status Indicators
-        if gemini_api_key and len(gemini_api_key.strip()) > 25:
-            st.success("✅ Gemini API Key: Valid format")
-        elif gemini_api_key and len(gemini_api_key.strip()) > 10:
-            st.warning("⚠️ Gemini API Key: Seems short, please verify")
-            
-        if weather_api_key and len(weather_api_key.strip()) > 25:
-            st.success("✅ OpenWeatherMap API Key: Valid format")
-        elif weather_api_key and len(weather_api_key.strip()) > 10:
-            st.warning("⚠️ OpenWeatherMap API Key: Seems short, please verify")
+            if st.button("🏠 Try Local AI Instead", use_container_width=True):
+                # Check if local AI is available
+                try:
+                    from api.local_api import check_lm_studio_connection
+                    if check_lm_studio_connection():
+                        st.session_state.ai_model_choice = "🏠 Local AI (LM Studio)"
+                        st.session_state.skip_api_key = True
+                        st.success("✅ Switched to Local AI mode! Loading application...")
+                        st.rerun()
+                    else:
+                        st.error("❌ Local AI (LM Studio) is not running. Please start LM Studio with a loaded model first.")
+                except Exception:
+                    st.error("❌ Local AI is not configured. Please use API keys instead.")
         
         # Additional help section
         st.markdown("---")
@@ -265,8 +165,8 @@ def show_api_key_popup():
             <p>🌍 <strong>Why do I need API keys?</strong></p>
             <p>This app uses Google's Gemini AI to analyze your location's conditions and OpenWeatherMap 
             to get real-time weather, soil, and air quality data for accurate plant recommendations.</p>
-            <p1>🔒 <strong>Privacy:</strong> Your API keys stay in your browser and are never stored on your servers.</p1><br>
-            <p2> We do not store any personal information or API keys on our servers.</p2>
+            
+            <p>🔒 <strong>Privacy:</strong> Your API keys stay in your browser and are never stored on our servers.</p>
         </div>
         """, unsafe_allow_html=True)
     
@@ -308,37 +208,94 @@ def create_minimal_sidebar():
     """
     st.sidebar.title("🌱 Plant Recommendation AI")
     
-    # AI Model Information
-    st.sidebar.markdown("### 🤖 AI Model")
-    st.sidebar.success("✅ Powered by Google Gemini")
-    st.sidebar.info("Using Gemini 1.5 Flash for analysis")
+    # AI Model Selection
+    st.sidebar.markdown("### 🤖 AI Model Selection")
     
-    # API Key Management
-    gemini_key_exists = 'gemini_api_key' in st.session_state and st.session_state.gemini_api_key
-    weather_key_exists = 'openweather_api_key' in st.session_state and st.session_state.openweather_api_key
+    # Check if LM Studio is available
+    try:
+        from api.local_api import check_lm_studio_connection
+        lm_studio_available = check_lm_studio_connection()
+    except Exception:
+        lm_studio_available = False
     
-    if gemini_key_exists and weather_key_exists:
-        st.sidebar.success("🔑 API Keys: Both Configured")
-        if st.sidebar.button("🔄 Change API Keys"):
-            if 'gemini_api_key' in st.session_state:
-                del st.session_state.gemini_api_key
-            if 'openweather_api_key' in st.session_state:
-                del st.session_state.openweather_api_key
-            st.rerun()
-    elif gemini_key_exists and not weather_key_exists:
-        st.sidebar.warning("⚠️ Gemini: ✅ | Weather: ❌")
-        if st.sidebar.button("🔑 Configure Weather API"):
-            st.rerun()
-    elif not gemini_key_exists and weather_key_exists:
-        st.sidebar.warning("⚠️ Gemini: ❌ | Weather: ✅")
-        if st.sidebar.button("🔑 Configure Gemini API"):
-            st.rerun()
+    if lm_studio_available:
+        ai_options = ["🌐 Web AI (Gemini)", "🏠 Local AI (LM Studio)"]
+        ai_help = "Choose between online Gemini AI or your local LM Studio model"
     else:
-        st.sidebar.error("❌ API Keys Required")
-        if st.sidebar.button("🔑 Configure API Keys"):
-            if 'skip_api_key' in st.session_state:
-                del st.session_state.skip_api_key
-            st.rerun()
+        ai_options = ["🌐 Web AI (Gemini)"]
+        ai_help = "Local AI not available. Make sure LM Studio is running with a loaded model."
+    
+    ai_choice = st.sidebar.radio(
+        "Select AI Model:",
+        ai_options,
+        index=ai_options.index(st.session_state.get('ai_model_choice', ai_options[0])) if st.session_state.get('ai_model_choice', ai_options[0]) in ai_options else 0,
+        help=ai_help
+    )
+    
+    # Store AI choice in session state only if it actually changed
+    if st.session_state.get('ai_model_choice') != ai_choice:
+        st.session_state.ai_model_choice = ai_choice
+        # Clear previous recommendations when switching models
+        if 'recommendations' in st.session_state:
+            del st.session_state.recommendations
+        if 'env_data' in st.session_state:
+            del st.session_state.env_data
+    
+    # Show model status
+    if "Local AI" in ai_choice:
+        if lm_studio_available:
+            st.sidebar.success("✅ LM Studio Connected")
+            try:
+                from api.local_api import get_available_models
+                models = get_available_models()
+                if models:
+                    st.sidebar.info(f"📦 Models: {len(models)} available")
+                    # Show first few model names
+                    for model in models[:2]:
+                        st.sidebar.text(f"• {model[:30]}...")
+                else:
+                    st.sidebar.warning("⚠️ No models loaded")
+            except Exception as e:
+                st.sidebar.error(f"❌ Error: {e}")
+        else:
+            st.sidebar.error("❌ LM Studio Not Available")
+            st.sidebar.markdown("""
+            **To use Local AI:**
+            1. Install LM Studio
+            2. Start the server: `lms server start`
+            3. Load a model (llama-3.2-3b-crop-recommender)
+            4. Ensure server runs on http://127.0.0.1:1234
+            """)
+    else:
+        st.sidebar.success("✅ Gemini AI Ready")
+        st.sidebar.info("Using Google Gemini 1.5 Flash")
+        
+        # API Key Management
+        gemini_key_exists = 'gemini_api_key' in st.session_state and st.session_state.gemini_api_key
+        weather_key_exists = 'openweather_api_key' in st.session_state and st.session_state.openweather_api_key
+        
+        if gemini_key_exists and weather_key_exists:
+            st.sidebar.success("🔑 API Keys: Both Configured")
+            if st.sidebar.button("🔄 Change API Keys"):
+                if 'gemini_api_key' in st.session_state:
+                    del st.session_state.gemini_api_key
+                if 'openweather_api_key' in st.session_state:
+                    del st.session_state.openweather_api_key
+                st.rerun()
+        elif gemini_key_exists and not weather_key_exists:
+            st.sidebar.warning("⚠️ Gemini: ✅ | Weather: ❌")
+            if st.sidebar.button("🔑 Configure Weather API"):
+                st.rerun()
+        elif not gemini_key_exists and weather_key_exists:
+            st.sidebar.warning("⚠️ Gemini: ❌ | Weather: ✅")
+            if st.sidebar.button("🔑 Configure Gemini API"):
+                st.rerun()
+        else:
+            st.sidebar.error("❌ API Keys Required")
+            if st.sidebar.button("🔑 Configure API Keys"):
+                if 'skip_api_key' in st.session_state:
+                    del st.session_state.skip_api_key
+                st.rerun()
     
     st.sidebar.markdown("---")
     st.sidebar.markdown("### 📍 Location Selection")
@@ -367,6 +324,8 @@ def create_minimal_sidebar():
         total_co2 = sum(extract_number_from_text(plant.get('air_quality_benefits', {}).get('co2_absorption', '25 kg')) for plant in recs)
         total_oxygen = sum(extract_number_from_text(plant.get('air_quality_benefits', {}).get('oxygen_production', '25 liters')) for plant in recs)
         
+        ai_model_used = "🏠 Local AI" if "Local AI" in st.session_state.get('ai_model_choice', '') else "🌐 Web AI"
+        
         st.sidebar.success(f"""
         **Your Selected Plants Will:**
         - Absorb {total_co2} kg CO2/year
@@ -374,11 +333,13 @@ def create_minimal_sidebar():
         - Improve local air quality
         - Support biodiversity
         
-        *Generated by Gemini AI*
+        *Generated by {ai_model_used}*
         """)
     
     return {
-        "minimal_sidebar": True
+        "minimal_sidebar": True, 
+        "ai_choice": ai_choice,
+        "lm_studio_available": lm_studio_available
     }
 
 def create_sidebar_inputs():

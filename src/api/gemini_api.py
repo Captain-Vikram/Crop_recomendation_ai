@@ -1,12 +1,31 @@
 import google.generativeai as genai
 import os
 import json
+import streamlit as st
 from dotenv import load_dotenv
+import datetime
+import re
 
 load_dotenv()
 
-# Configure Gemini API
-genai.configure(api_key=os.getenv('GEMINI_API_KEY'))
+def configure_gemini_api():
+    """
+    Configure Gemini API with key from session state or environment
+    """
+    # Try to get API key from session state first
+    api_key = None
+    if hasattr(st, 'session_state') and 'gemini_api_key' in st.session_state:
+        api_key = st.session_state.gemini_api_key
+    
+    # Fallback to environment variable
+    if not api_key:
+        api_key = os.getenv('GEMINI_API_KEY')
+    
+    if not api_key:
+        raise ValueError("No Gemini API key found. Please provide an API key.")
+    
+    genai.configure(api_key=api_key)
+    return api_key
 
 def get_goal_specific_instructions(goal_type, region):
     """
@@ -51,6 +70,9 @@ def get_recommendations(location_data, prefer_native=True, goal_type="afforestat
     Get comprehensive plant/crop recommendations from Gemini AI
     """
     try:
+        # Configure API first
+        configure_gemini_api()
+        
         # Generate user goal from goal type
         goal_mapping = {
             'cash_crops': 'commercial cash crop cultivation for maximum economic returns',
