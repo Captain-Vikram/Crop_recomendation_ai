@@ -635,7 +635,7 @@ def generate_detailed_report(recommendations, env_data):
 - **Organic Carbon:** {env_data.get('soil_organic_carbon', 'N/A')}%
 
 ### 🌬️ Air Quality Status
-- **Air Quality Index:** {env_data.get('aqi', 'N/A')} (1=Excellent, 5=Hazardous)
+- **Air Quality Index:** {env_data.get('aqi', 106)} ({env_data.get('aqi_rating', 3)}/5 rating)
 - **PM2.5 Level:** {env_data.get('pm2_5', 'N/A')} μg/m³
 
 ---
@@ -962,7 +962,7 @@ def create_enhanced_reportlab_pdf(recommendations, env_data):
             ["Temperature", f"{env_data.get('temperature', 25)}°C", "Good for tropical plants"],
             ["Humidity", f"{env_data.get('humidity', 65)}%", "Optimal moisture levels"],
             ["Annual Rainfall", f"{env_data.get('rainfall', 1000)}mm", "Adequate water supply"],
-            ["Air Quality Index", f"{env_data.get('aqi', 3)}/5", "Plants will help improve air quality"],
+            ["Air Quality Index", f"{env_data.get('aqi', 106)} ({env_data.get('aqi_rating', 3)}/5)", "Plants will help improve air quality"],
             ["Climate Type", env_data.get('climate_type', 'Tropical'), "Suitable for diverse vegetation"]
         ]
         
@@ -983,8 +983,8 @@ def create_enhanced_reportlab_pdf(recommendations, env_data):
         # Plant Recommendations using real AI data
         story.append(Paragraph("🌿 Top Recommended Plants for Your Area", heading_style))
         
-        # Use actual recommendations from AI (limit to top 3 for PDF simplicity)
-        for i, plant in enumerate(recommendations[:3], 1):
+        # Use actual recommendations from AI (limit to top 5 for comprehensive coverage)
+        for i, plant in enumerate(recommendations[:5], 1):
             if plant.get('error'):
                 continue  # Skip error entries
                 
@@ -1117,12 +1117,12 @@ ENVIRONMENTAL CONDITIONS:
 - Temperature: {env_data.get('temperature', 25)}°C
 - Humidity: {env_data.get('humidity', 65)}%
 - Rainfall: {env_data.get('rainfall', 1000)}mm/year
-- Air Quality Index: {env_data.get('aqi', 3)}/5
+- Air Quality Index: {env_data.get('aqi', 106)} ({env_data.get('aqi_rating', 3)}/5)
 
 TOP RECOMMENDED PLANTS:
 """
         
-        for i, plant in enumerate(recommendations[:3], 1):
+        for i, plant in enumerate(recommendations[:5], 1):
             if plant.get('error'):
                 continue
             

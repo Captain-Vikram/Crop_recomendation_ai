@@ -1,6 +1,3 @@
-# Air quality data is now handled by weather_api.py using OpenWeatherMap
-# This file is kept for compatibility but redirects to weather_api
-
 from .weather_api import get_weather_data
 
 def get_air_quality_data(lat, lon):

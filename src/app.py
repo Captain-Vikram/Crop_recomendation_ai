@@ -1,5 +1,4 @@
 import streamlit as st
-import streamlit as st
 import sys
 import os
 from datetime import datetime
@@ -11,7 +10,8 @@ sys.path.append(os.path.dirname(os.path.abspath(__file__)))
 from api.soil_api import get_soil_data
 from api.weather_api import get_weather_data
 from api.air_quality_api import get_air_quality_data
-from api.gemini_api import get_recommendations
+from api.gemini_api import get_recommendations as get_gemini_recommendations
+from api.local_api import get_recommendations as get_local_recommendations, check_lm_studio_connection
 from utils.location_handler import get_lat_lon, validate_pin_code, get_location_name
 from utils.data_processor import format_data_for_ai, validate_environmental_data, get_data_quality_summary, create_environmental_summary
 from components.ui_components import create_minimal_sidebar, display_environmental_summary, display_recommendations, display_data_quality_info
@@ -34,17 +34,99 @@ def main():
     # Apply custom styling
     apply_custom_styles()
     
-    # Create header
-    create_app_header()
-    
-    # Initialize session state
+    # Initialize session state FIRST
     if 'recommendations' not in st.session_state:
         st.session_state.recommendations = None
     if 'env_data' not in st.session_state:
         st.session_state.env_data = None
+    if 'ai_model_choice' not in st.session_state:
+        st.session_state.ai_model_choice = "🌐 Web AI (Gemini)"
+    
+    # Create header (after session state is initialized)
+    create_app_header()
     
     # Create minimal sidebar
     create_minimal_sidebar()
+    
+    # Prominent AI Model Selection Banner
+    st.markdown("""
+    <div style="
+        background: linear-gradient(90deg, #4CAF50 0%, #8BC34A 100%);
+        padding: 15px;
+        border-radius: 10px;
+        margin-bottom: 20px;
+        text-align: center;
+        color: white;
+    ">
+        <h3 style="margin: 0; color: white;">🤖 Choose Your AI Model</h3>
+    </div>
+    """, unsafe_allow_html=True)
+    
+    # Check if LM Studio is available
+    try:
+        lm_studio_available = check_lm_studio_connection()
+    except Exception as e:
+        lm_studio_available = False
+    
+    # Create AI selection columns
+    if lm_studio_available:
+        ai_col1, ai_col2 = st.columns(2)
+        
+        with ai_col1:
+            web_ai_selected = st.button(
+                "🌐 Web AI (Gemini)\n\nOnline • Comprehensive • Cloud-based",
+                key="web_ai_btn",
+                use_container_width=True,
+                help="Uses Google Gemini AI via internet connection"
+            )
+            if web_ai_selected:
+                st.session_state.ai_model_choice = "🌐 Web AI (Gemini)"
+                st.rerun()
+        
+        with ai_col2:
+            local_ai_selected = st.button(
+                "🏠 Local AI (LM Studio)\n\nPrivate • Offline • Local processing",
+                key="local_ai_btn", 
+                use_container_width=True,
+                help="Uses your local LM Studio model for complete privacy"
+            )
+            if local_ai_selected:
+                st.session_state.ai_model_choice = "🏠 Local AI (LM Studio)"
+                st.rerun()
+    else:
+        st.button(
+            "🌐 Web AI (Gemini)\n\nOnline • Comprehensive • Cloud-based",
+            key="web_ai_only_btn",
+            use_container_width=True,
+            disabled=False,
+            help="Uses Google Gemini AI via internet connection"
+        )
+        st.session_state.ai_model_choice = "🌐 Web AI (Gemini)"
+        
+        # Show local AI setup info
+        st.info("🏠 **Local AI not available.** To enable local AI, install and run LM Studio with a loaded model.")
+    
+    # Display current selection
+    current_ai = st.session_state.get('ai_model_choice', '🌐 Web AI (Gemini)')
+    
+    if "Local AI" in current_ai:
+        if lm_studio_available:
+            st.success(f"✅ **Currently using:** {current_ai}")
+            # Show model info
+            try:
+                from api.local_api import get_available_models
+                models = get_available_models()
+                if models:
+                    st.info(f"📦 **Active model:** {models[0]}")
+            except Exception:
+                pass
+        else:
+            st.error("❌ Local AI selected but LM Studio not available. Falling back to Web AI.")
+            st.session_state.ai_model_choice = "🌐 Web AI (Gemini)"
+    else:
+        st.success(f"✅ **Currently using:** {current_ai}")
+    
+    st.markdown("---")
     
     # Main content area
     # Create location selection interface
@@ -299,7 +381,7 @@ def main():
                     st.warning("Please select your goal first!")
         
         # Display cached recommendations if available
-        if st.session_state.recommendations and st.session_state.env_data:
+        if st.session_state.get('recommendations') and st.session_state.get('env_data'):
             display_results()
             
             # Add comprehensive report download
@@ -358,14 +440,25 @@ def generate_recommendations_from_coords(lat, lon, goal_type, prefer_native):
         formatted_data['location'] = location_name or f"Location ({lat:.4f}, {lon:.4f})"
         
         # Get AI recommendations with goal type and user preferences
-        with st.spinner("Generating AI-powered recommendations..."):
-            recommendations = get_recommendations(
-                formatted_data,
-                prefer_native,
-                goal_type=goal_type,
-                lat=lat,
-                lon=lon
-            )
+        ai_choice = st.session_state.get('ai_model_choice', '🌐 Web AI (Gemini)')
+        
+        with st.spinner(f"Generating AI-powered recommendations using {ai_choice}..."):
+            if "Local AI" in ai_choice:
+                recommendations = get_local_recommendations(
+                    formatted_data,
+                    prefer_native,
+                    goal_type=goal_type,
+                    lat=lat,
+                    lon=lon
+                )
+            else:
+                recommendations = get_gemini_recommendations(
+                    formatted_data,
+                    prefer_native,
+                    goal_type=goal_type,
+                    lat=lat,
+                    lon=lon
+                )
         
         loading_placeholder.empty()
         
@@ -381,7 +474,8 @@ def generate_recommendations_from_coords(lat, lon, goal_type, prefer_native):
             'afforestation': 'environmental trees'
         }
         
-        success_message = f"✅ Generated {len(recommendations)} {goal_text.get(goal_type, 'plant')} recommendations for {formatted_data['location']}"
+        ai_model_name = "🏠 Local AI" if "Local AI" in ai_choice else "🌐 Web AI"
+        success_message = f"✅ Generated {len(recommendations)} {goal_text.get(goal_type, 'plant')} recommendations for {formatted_data['location']} using {ai_model_name}"
         
         # Add note about user preferences if they were used
         if user_preferences and any([

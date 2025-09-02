@@ -121,7 +121,7 @@ def create_error_response(error_message):
 
 def create_enhanced_recommendation_prompt(data, user_goal, prefer_native, goal_type="afforestation", lat=20.5937, lon=78.9629):
     """
-    Create an enhanced, agentic prompt for comprehensive plant recommendations
+    Create an enhanced, agentic prompt for Gemini with comprehensive plant recommendations and specific measurements
     """
     # Determine region for regional context
     region = "North India" if lat > 26 else "South India" if lat < 15 else "West India" if lon < 77 else "East India"
@@ -190,7 +190,7 @@ LOCATION & ENVIRONMENTAL ANALYSIS FOR {data.get('location', 'India')}:
 🧪 Soil pH: {data.get('soil_ph', 6.5)}
 🏔️ Soil Texture: {data.get('soil_texture', 'clay loam')}{' (User-specified)' if data.get('user_soil_input') else ''}
 🌱 Soil Organic Carbon: {data.get('soil_organic_carbon', 1.8)}%
-🌬️ Air Quality Index: {data.get('aqi', 3)} (1=Excellent, 5=Hazardous)
+🌬️ Air Quality Index: {data.get('aqi', 106)} ({data.get('aqi_rating', 3)}/5 rating)
 💨 PM2.5 Level: {data.get('pm2_5', 35)} μg/m³
 🌀 Climate Type: {data.get('climate_type', 'tropical')}
 {f"📐 Available Space: {data.get('available_space')} sq meters" if data.get('available_space') else ''}
@@ -207,27 +207,38 @@ GOAL-SPECIFIC REQUIREMENTS:
 ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 {get_goal_specific_instructions(goal_type, region)}
 
-INDIAN CROP/PLANT KNOWLEDGE:
+WATER & SUNLIGHT SPECIFICATION GUIDELINES:
 ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
-For {region}, prioritize regionally adapted varieties:
-- Use local/Hindi names alongside scientific names
-- Consider seasonal growing patterns (Kharif/Rabi/Zaid)
-- Include traditional varieties with cultural significance
-- Focus on climate-resilient and drought-tolerant options
-- Recommend established market varieties with good supply chains
+WATER REQUIREMENTS (be SPECIFIC with liters):
+• Large Trees (>10m): 50-200 liters per week when mature
+• Medium Trees (5-10m): 20-80 liters per week when mature  
+• Small Trees (<5m): 10-40 liters per week when mature
+• Shrubs: 5-20 liters per week when mature
+• Food Crops: 2-10 liters per plant per week (varies by crop)
+• Herbs/Small Plants: 0.5-3 liters per plant per week
+• Potted Plants: 0.2-2 liters per plant per day
 
-AGENTIC THINKING PROCESS:
-━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
-Please think through this systematically:
+SUNLIGHT REQUIREMENTS (be SPECIFIC with hours):
+• Full Sun: 6-8 hours direct sunlight daily
+• Partial Sun: 4-6 hours direct sunlight daily  
+• Partial Shade: 2-4 hours direct sunlight daily
+• Full Shade: <2 hours direct sunlight daily
 
-1. ENVIRONMENTAL ASSESSMENT: Analyze the soil, climate, and air quality conditions
-2. USER PREFERENCES: PRIORITIZE user-specified preferences over API data
-3. GOAL ALIGNMENT: Match plant species to the specific user goals
-4. SPACE CONSTRAINTS: Ensure recommendations fit within available space
-5. BUDGET CONSIDERATION: Match plant costs to user budget preferences
-6. NATIVE PREFERENCE: Prioritize indigenous species if requested
-7. URBAN ADAPTATION: Consider pollution tolerance and space constraints
-8. SUSTAINABILITY: Focus on long-term ecosystem benefits
+ADJUST water amounts based on:
+- Seedling stage: 50% of mature amount
+- Young plant: 75% of mature amount
+- Mature plant: 100% amount
+- Dry season: +25-50% more water
+- Monsoon season: Reduce by 50-75%
+
+SEASONAL SUITABILITY & PLANTING WINDOW (CRITICAL):
+• CURRENT SEASON: {current_season} — ONLY recommend plants that are appropriate to plant or establish in {current_season} in the specified region.
+• If a plant is not suitable to be planted right now, the model MUST explicitly state "Not ideal to plant now" and provide the next optimal planting window (months and season) and the reason.
+• For each recommended species, include a "planting_window" field with: "best_months": ["Mon", "Jun"], "can_plant_now": true/false, and a 1-2 sentence justification tied to local climate/seasonality.
+• Prefer varieties/management steps that enable successful establishment if planting in the current season (e.g., suggest root-balled saplings, shade nets, mulching depth, irrigation schedule) when recommending species that can be established now with mitigation.
+• For food crops and short-duration crops, ensure the cultivar and planting timing will allow at least one full harvest cycle in the upcoming season(s) given current month.
+• Always provide the recommended planting month(s) and a 1-line "why now/how to mitigate" if recommending off-window planting.
+
 
 REQUIRED OUTPUT FORMAT:
 ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
@@ -244,108 +255,129 @@ Provide exactly 5 plant recommendations in the following comprehensive JSON form
       "suitability_score": "8.5/10",
       "suitability_analysis": "Detailed 3-4 sentence analysis of why this plant suits the environmental conditions",
       
+      "water_requirements": {{
+        "seedling_stage": "X liters per plant per day/week for first 6 months (be specific: e.g., '2.5 liters per plant per day')",
+        "young_plant": "X liters per plant per day/week for 6 months to 2 years (be specific: e.g., '15 liters per plant per week')",
+        "mature_plant": "X liters per plant per day/week for mature plant (be specific: e.g., '40 liters per plant per week')",
+        "dry_season_adjustment": "Additional X liters or +X% increase during dry months",
+        "monsoon_reduction": "Reduce to X liters or -X% during monsoon season",
+        "water_conservation_methods": "Specific techniques like drip irrigation (X liters/hour), mulching (X cm deep), rainwater harvesting potential"
+      }},
+      
+      "sunlight_requirements": {{
+        "daily_hours_needed": "X-Y hours (be specific: e.g., '6-8 hours')",
+        "light_intensity": "Full Sun/Partial Sun/Partial Shade/Full Shade",
+        "optimal_direction": "Best placement direction (e.g., 'South-facing', 'East morning sun')",
+        "shade_tolerance": "Can tolerate X hours less sunlight if needed",
+        "seasonal_adjustments": "Summer/winter sunlight requirement changes"
+      }},
+      
       "air_quality_benefits": {{
         "pollution_reduction": "Specific air pollutants this plant removes (PM2.5, SO2, NO2, etc.)",
-        "oxygen_production": "Estimated oxygen production per day",
-        "co2_absorption": "Estimated CO2 absorption per year",
-        "aqi_improvement": "Expected AQI improvement potential"
+        "oxygen_production": "Estimated oxygen production per day in liters",
+        "co2_absorption": "Estimated CO2 absorption per year in kg",
+        "aqi_improvement": "Expected AQI improvement potential (numerical if possible)"
       }},
       
       "plantation_guide": {{
-        "best_season": "Optimal planting season with months",
-        "soil_preparation": "Step-by-step soil preparation instructions",
-        "planting_method": "Detailed planting procedure with spacing",
-        "initial_care": "First 30 days care instructions"
-      }},
-      
-      "watering_patterns": {{
-        "seedling_stage": "Daily water requirements for first 6 months",
-        "young_plant": "Watering schedule for 6 months to 2 years", 
-        "mature_plant": "Long-term watering needs",
-        "seasonal_variations": "Adjustments for monsoon/dry seasons",
-        "water_conservation_tips": "Techniques to minimize water usage"
+        "best_season": "Optimal planting season with specific months",
+        "soil_preparation": "Step-by-step soil preparation with measurements (pit size, fertilizer amounts)",
+        "planting_method": "Detailed planting procedure with exact spacing in meters",
+        "initial_care": "First 30 days care with specific water amounts and frequency"
       }},
       
       "growth_characteristics": {{
-        "mature_height": "Expected height with range",
-        "mature_spread": "Canopy/root spread",
-        "growth_rate": "Fast/Medium/Slow with timeline",
-        "lifespan": "Expected plant lifespan",
-        "space_requirements": "Minimum area needed"
+        "mature_height": "Expected height range in meters (e.g., '8-12 meters')",
+        "mature_spread": "Canopy/root spread in meters (e.g., '4-6 meters')",
+        "growth_rate": "Fast/Medium/Slow with specific timeline (e.g., 'Fast: 2-3 meters per year')",
+        "lifespan": "Expected plant lifespan in years",
+        "space_requirements": "Minimum area needed in square meters per plant"
       }},
       
       "maintenance_schedule": {{
-        "daily": "Daily maintenance tasks",
-        "weekly": "Weekly care requirements",
-        "monthly": "Monthly maintenance",
-        "seasonal": "Seasonal care activities",
-        "annual": "Yearly maintenance tasks"
+        "daily": "Daily tasks with specific times/amounts",
+        "weekly": "Weekly care with specific measurements",
+        "monthly": "Monthly maintenance with exact requirements",
+        "seasonal": "Seasonal care with specific quantities",
+        "annual": "Yearly maintenance with precise instructions"
       }},
       
       "environmental_impact": {{
-        "carbon_sequestration": "Annual carbon storage capacity",
-        "biodiversity_support": "Wildlife and ecosystem benefits",
-        "soil_improvement": "How it enhances soil quality",
-        "microclimate_effects": "Local climate modification",
-        "erosion_control": "Soil conservation benefits"
+        "carbon_sequestration": "Annual carbon storage in kg per plant",
+        "biodiversity_support": "Wildlife species supported (with numbers if possible)",
+        "soil_improvement": "Specific soil benefits with measurable improvements",
+        "microclimate_effects": "Temperature reduction in degrees, humidity increase percentage",
+        "erosion_control": "Soil retention capacity and root strength"
       }},
       
       "economic_benefits": {{
-        "initial_cost": "Estimated planting cost",
-        "maintenance_cost_annual": "Yearly maintenance expenses",
-        "economic_returns": "Potential monetary benefits (fruit, timber, etc.)",
-        "property_value_impact": "Effect on land/property value",
-        "long_term_savings": "Cost savings over time"
+        "initial_cost": "Estimated planting cost in INR per plant",
+        "maintenance_cost_annual": "Yearly maintenance expenses in INR per plant",
+        "economic_returns": "Potential monetary benefits with specific amounts/timeline",
+        "property_value_impact": "Property value increase percentage or amount",
+        "long_term_savings": "Specific cost savings over 5/10 years"
       }},
       
       "challenges_and_solutions": {{
-        "common_problems": "Typical issues faced during cultivation",
-        "pest_management": "Natural pest control methods",
-        "disease_prevention": "Disease prevention strategies",
-        "climate_adaptation": "Handling extreme weather",
-        "troubleshooting": "Quick fixes for common issues"
+        "common_problems": "Typical issues with specific symptoms and solutions",
+        "pest_management": "Natural pest control methods with application rates",
+        "disease_prevention": "Disease prevention with specific treatments and frequencies",
+        "climate_adaptation": "Handling extreme weather with specific protection measures",
+        "troubleshooting": "Quick fixes with step-by-step instructions and quantities"
       }},
       
-      "user_goal_alignment": "2-3 sentences explaining how this plant specifically addresses the user's stated goals",
-      "additional_uses": "Secondary benefits like medicinal uses, food production, etc.",
-      "companion_plants": "Plants that grow well together with this species"
+      "user_goal_alignment": "2-3 sentences explaining how this plant specifically addresses the user's stated goals with measurable benefits",
+      "additional_uses": "Secondary benefits like medicinal uses, food production with quantities/yields",
+      "companion_plants": "Specific plants that grow well together with optimal spacing"
     }}
   ],
   
   "site_specific_recommendations": {{
-    "soil_amendments": "Specific improvements needed for this location",
-    "irrigation_strategy": "Optimal watering system for local conditions", 
-    "layout_suggestions": "Recommended spatial arrangement of plants",
-    "timeline": "Month-by-month planting and care schedule",
-    "success_metrics": "How to measure plantation success"
+    "soil_amendments": "Specific improvements needed with exact quantities (kg of compost, fertilizer amounts)",
+    "irrigation_strategy": "Optimal watering system with flow rates (liters/hour), coverage area, and scheduling",
+    "layout_suggestions": "Plant arrangement with exact spacing measurements and total area utilization",
+    "timeline": "Month-by-month planting and care schedule with specific activities and quantities",
+    "success_metrics": "Measurable targets: survival rate %, growth rate cm/month, canopy coverage %, AQI improvement points"
   }},
   
   "long_term_management": {{
-    "year_1": "First year expectations and care",
-    "years_2_5": "Medium-term management strategy",
-    "beyond_5_years": "Long-term maintenance and harvesting",
-    "succession_planning": "How to expand or replace plants over time"
+    "year_1": "First year expectations: height increase, water needs, survival targets",
+    "years_2_5": "Medium-term targets: mature size percentage, productivity levels, maintenance reduction",
+    "beyond_5_years": "Long-term yields, harvesting quantities, replacement planning",
+    "succession_planning": "Expansion strategy with additional plant numbers and timeline"
   }}
 }}
 
-CRITICAL REQUIREMENTS:
-- PRIORITIZE user-specified preferences over API data (water, soil, space, budget)
-- Ensure all plants fit within the available space if specified
-- Match budget preferences when provided
-- Ensure all plants are suitable for the specific environmental conditions provided
-- Focus heavily on air quality improvement given the urban context
-- Provide actionable, location-specific advice
-- Include realistic timelines and costs
-- Prioritize drought tolerance and low maintenance where appropriate
-- Consider the user's specific goals throughout all recommendations
-{f"- SPACE CONSTRAINT: All recommended plants must fit within {data.get('available_space')} sq meters total" if data.get('available_space') else ''}
-{f"- BUDGET CONSTRAINT: Match {data.get('budget_preference')} range in cost recommendations" if data.get('budget_preference') and data.get('budget_preference') != 'Auto-suggest' else ''}
+CRITICAL REQUIREMENTS FOR WATER & SUNLIGHT:
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+✅ ALWAYS provide EXACT water amounts in liters (not vague terms like "moderate watering")
+✅ ALWAYS provide EXACT sunlight hours (e.g., "6-8 hours" not "full sun")
+✅ Match water amounts to plant type:
+   - Large trees: 100-200L/week when mature
+   - Medium trees: 30-80L/week when mature  
+   - Shrubs: 10-30L/week when mature
+   - Crops: 3-15L/week per plant
+   - Herbs: 1-5L/week per plant
+   - Potted plants: 0.5-3L/day per plant
 
-IMPORTANT: Respond ONLY with valid JSON. Do not add any text before or after the JSON. 
-Ensure the JSON is complete and properly closed. Each string value must be properly quoted and escaped.
-Start your response with {{ and end with }}.
+✅ Adjust water for growth stages:
+   - Seedling: 50% of mature amount
+   - Young: 75% of mature amount  
+   - Mature: 100% amount
 
-Make the response comprehensive, practical, and scientifically accurate.
+✅ Include seasonal water adjustments:
+   - Summer: +30-50% more water
+   - Monsoon: -50-70% less water
+
+✅ Provide specific sunlight placement advice based on location type
+✅ All measurements must be realistic for Indian climate conditions
+✅ PRIORITIZE user-specified preferences over API data
+✅ Ensure all plants fit within available space if specified
+✅ Include realistic costs in INR
+✅ Focus on plants suitable for {region} climate
+
+IMPORTANT: Respond ONLY with valid JSON. Start with {{ and end with }}. No additional text.
+Make every measurement specific and actionable. Replace ALL vague terms with exact quantities.
 """
     return prompt
 

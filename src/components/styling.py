@@ -110,6 +110,35 @@ def apply_custom_styles():
         background-color: #45a049;
     }
     
+    /* AI Selection Button Styling */
+    .stButton[data-testid="baseButton-secondary"] > button {
+        background: linear-gradient(135deg, #f8f9fa 0%, #e9ecef 100%);
+        border: 2px solid #4CAF50;
+        color: #2E7D32;
+        padding: 20px;
+        border-radius: 12px;
+        font-size: 1rem;
+        font-weight: 600;
+        white-space: pre-line;
+        height: auto;
+        min-height: 80px;
+        transition: all 0.3s ease;
+    }
+    
+    .stButton[data-testid="baseButton-secondary"] > button:hover {
+        background: linear-gradient(135deg, #e8f5e8 0%, #f1f8e9 100%);
+        border-color: #2E7D32;
+        transform: translateY(-2px);
+        box-shadow: 0 6px 16px rgba(76, 175, 80, 0.2);
+    }
+    
+    .stButton[data-testid="baseButton-secondary"] > button:active,
+    .stButton[data-testid="baseButton-secondary"] > button:focus {
+        background: linear-gradient(135deg, #c8e6c9 0%, #dcedc8 100%);
+        border-color: #1B5E20;
+        color: #1B5E20;
+    }
+    
     /* Success/Warning/Error message styling */
     .stSuccess {
         background-color: #d4edda;
@@ -147,6 +176,34 @@ def apply_custom_styles():
     footer {visibility: hidden;}
     header {visibility: hidden;}
     
+    /* AI Model Selection Styling */
+    .ai-model-card {
+        background: linear-gradient(135deg, #f8f9fa 0%, #e9ecef 100%);
+        border: 2px solid #4CAF50;
+        border-radius: 12px;
+        padding: 20px;
+        margin: 15px 0;
+        box-shadow: 0 4px 8px rgba(0,0,0,0.1);
+        transition: all 0.3s ease;
+    }
+    
+    .ai-model-card:hover {
+        transform: translateY(-2px);
+        box-shadow: 0 6px 16px rgba(76, 175, 80, 0.2);
+    }
+    
+    .ai-model-selected {
+        background: linear-gradient(135deg, #e8f5e8 0%, #f1f8e9 100%);
+        border-color: #2E7D32;
+    }
+    
+    /* Radio button styling for AI selection */
+    div[data-testid="stRadio"] > label {
+        font-size: 1.1rem;
+        font-weight: 600;
+        color: #2E7D32;
+    }
+    
     /* Custom scrollbar */
     ::-webkit-scrollbar {
         width: 8px;
@@ -169,12 +226,19 @@ def apply_custom_styles():
 
 def create_app_header():
     """
-    Create the main application header
+    Create the main application header with AI model indicator
     """
-    st.markdown("""
+    # Get current AI choice from session state
+    ai_choice = st.session_state.get('ai_model_choice', '🌐 Web AI (Gemini)')
+    ai_indicator = "🏠 Local AI" if "Local AI" in ai_choice else "🌐 Web AI"
+    
+    st.markdown(f"""
     <div class="main-header">
         <h1>🌱 Crop & Afforestation AI Bot</h1>
         <p>Get personalized plant recommendations for sustainable urban afforestation in India</p>
+        <div style="margin-top: 10px; padding: 8px 16px; background: rgba(255,255,255,0.2); border-radius: 20px; display: inline-block;">
+            <strong>Current AI: {ai_indicator}</strong>
+        </div>
     </div>
     """, unsafe_allow_html=True)
 
