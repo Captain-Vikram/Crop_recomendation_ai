@@ -7,16 +7,19 @@ def show_api_key_popup():
     Show API key input popup at application launch
     Returns True if API keys are provided, False otherwise
     """
+    # If user explicitly requested to show this popup, don't short-circuit
+    force_show = st.session_state.get('force_show_api_popup', False)
     # Check if both API keys are already stored in session state
     gemini_key_exists = 'gemini_api_key' in st.session_state and st.session_state.gemini_api_key
     weather_key_exists = 'openweather_api_key' in st.session_state and st.session_state.openweather_api_key
     
-    if gemini_key_exists and weather_key_exists:
-        return True
-    
-    # Check if user chose to skip API key (local AI mode)
-    if 'skip_api_key' in st.session_state and st.session_state.skip_api_key:
-        return True
+    if not force_show:
+        if gemini_key_exists and weather_key_exists:
+            return True
+        
+        # Check if user chose to skip API key (local AI mode)
+        if 'skip_api_key' in st.session_state and st.session_state.skip_api_key:
+            return True
     
     # Create the popup content with better styling
     st.markdown("""
@@ -226,6 +229,9 @@ def show_api_key_popup():
                     st.session_state.gemini_api_key = gemini_api_key.strip() if gemini_api_key else ""
                     st.session_state.openweather_api_key = weather_api_key.strip() if weather_api_key else ""
                     st.session_state.ai_model_choice = "🌐 Web AI (Gemini)"
+                    # Clear forced popup flag after successful save
+                    if 'force_show_api_popup' in st.session_state:
+                        st.session_state.force_show_api_popup = False
                     st.success("✅ Both API keys saved successfully! Loading application...")
                     st.rerun()
                 elif not gemini_valid and not weather_valid:
@@ -235,12 +241,26 @@ def show_api_key_popup():
                 elif not weather_valid:
                     st.error("❌ Please enter a valid OpenWeatherMap API key")
         with col_b:
+            # Test Mode section (positioned next to Continue button, before info)
+            # col_tm1, col_tm2 = st.columns([1, 2])
             if st.button("🧪 Enable Test Mode", use_container_width=True):
-                # Check for env-based keys (at least Gemini required)
+                # Check for keys in Streamlit secrets first, then environment
+                gemini_secret = None
+                weather_secret = None
+                try:
+                    gemini_secret = st.secrets["GEMINI_API_KEY"]
+                except Exception:
+                    gemini_secret = None
+                try:
+                    weather_secret = st.secrets["OPENWEATHERMAP_API_KEY"]
+                except Exception:
+                    weather_secret = None
                 env_gemini = os.getenv("GEMINI_API_KEY", "").strip()
                 env_weather = os.getenv("OPENWEATHERMAP_API_KEY", "").strip()
-                if not env_gemini:
-                    st.error("❌ Test Mode requires GEMINI_API_KEY in your .env file.")
+                # Prefer secrets > env
+                has_gemini = bool(gemini_secret) or bool(env_gemini)
+                if not has_gemini:
+                    st.error("❌ Test Mode requires GEMINI_API_KEY in Streamlit secrets or your .env file.")
                 else:
                     # Activate test mode and bypass popup
                     st.session_state.test_mode = True
@@ -249,22 +269,24 @@ def show_api_key_popup():
                     # Ensure popup is skipped for this session
                     st.session_state.skip_api_key = True
                     # Do NOT store keys in session; APIs will read from environment
+                    # Clear forced popup flag
+                    if 'force_show_api_popup' in st.session_state:
+                        st.session_state.force_show_api_popup = False
                     st.success("✅ Test Mode enabled. You can explore the app without entering keys.")
                     st.rerun()
-        
-        st.info("Test Mode is for evaluation only and capped at 5 recommendation generations.")
-        
+        st.warning("Test Mode is for evaluation only and capped at 5 recommendation generations.")
+
         st.info("""
-        💡 **Important Notes:**
-        
-        🆓 Both API keys are **completely FREE**
-        
-        ⚡ **Gemini:** Ready immediately
-        
-        ⏰ **OpenWeatherMap:** Takes 10-120 minutes to activate after signup
-        
-        🔒 Your keys stay secure in your browser only
-        """)
+    💡 **Important Notes:**
+    
+    🆓 Both API keys are **completely FREE**
+    
+    ⚡ **Gemini:** Ready immediately
+    
+    ⏰ **OpenWeatherMap:** Takes 10-120 minutes to activate after signup
+    
+    🔒 Your keys stay secure in your browser only
+    """)
 
         # Test Mode section
         
@@ -341,7 +363,10 @@ def create_minimal_sidebar():
         st.sidebar.info(f"🧪 Test Mode: {remaining} of {st.session_state.get('test_mode_max_uses', 5)} uses remaining")
         if remaining == 0:
             st.sidebar.error("Test Mode limit reached. Add API keys to continue.")
-        if st.sidebar.button("🚪 Exit Test Mode"):
+        if st.sidebar.button("� Configure API / Test Mode"):
+            st.session_state.force_show_api_popup = True
+            st.rerun()
+        if st.sidebar.button("�🚪 Exit Test Mode"):
             st.session_state.test_mode = False
             st.session_state.test_mode_uses = 0
             st.session_state.test_mode_max_uses = 5
@@ -355,25 +380,47 @@ def create_minimal_sidebar():
         
         if gemini_key_exists and weather_key_exists:
             st.sidebar.success("🔑 API Keys: Both Configured")
-            if st.sidebar.button("🔄 Change API Keys"):
-                if 'gemini_api_key' in st.session_state:
-                    del st.session_state.gemini_api_key
-                if 'openweather_api_key' in st.session_state:
-                    del st.session_state.openweather_api_key
+            if st.sidebar.button("� Configure API / Test Mode"):
+                st.session_state.force_show_api_popup = True
                 st.rerun()
         elif gemini_key_exists and not weather_key_exists:
             st.sidebar.warning("⚠️ Gemini: ✅ | Weather: ❌")
-            if st.sidebar.button("🔑 Configure Weather API"):
+            if st.sidebar.button("� Configure API / Test Mode"):
+                st.session_state.force_show_api_popup = True
                 st.rerun()
         elif not gemini_key_exists and weather_key_exists:
             st.sidebar.warning("⚠️ Gemini: ❌ | Weather: ✅")
-            if st.sidebar.button("🔑 Configure Gemini API"):
+            if st.sidebar.button("� Configure API / Test Mode"):
+                st.session_state.force_show_api_popup = True
                 st.rerun()
         else:
             st.sidebar.error("❌ API Keys Required")
-            if st.sidebar.button("🔑 Configure API Keys"):
+            if st.sidebar.button("� Configure API / Test Mode"):
+                st.session_state.force_show_api_popup = True
                 if 'skip_api_key' in st.session_state:
                     del st.session_state.skip_api_key
+                st.rerun()
+
+        # Always-visible Test Mode quick toggle
+        st.sidebar.markdown("### 🧪 Test Mode (No Keys)")
+        st.sidebar.caption("Uses keys from Streamlit Secrets or .env. Limited to 5 runs.")
+        if st.sidebar.button("🧪 Enable Test Mode"):
+            # Check for keys in Streamlit secrets first, then environment
+            gemini_secret = None
+            try:
+                gemini_secret = st.secrets["GEMINI_API_KEY"]
+            except Exception:
+                gemini_secret = None
+            env_gemini = os.getenv("GEMINI_API_KEY", "").strip()
+            has_gemini = bool(gemini_secret) or bool(env_gemini)
+            if not has_gemini:
+                st.sidebar.error("GEMINI_API_KEY missing in secrets or .env")
+            else:
+                st.session_state.test_mode = True
+                st.session_state.test_mode_uses = st.session_state.get('test_mode_uses', 0)
+                st.session_state.test_mode_max_uses = 5
+                st.session_state.skip_api_key = True
+                st.session_state.force_show_api_popup = False
                 st.rerun()
     
     st.sidebar.markdown("---")
