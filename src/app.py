@@ -50,6 +50,24 @@ def main():
     # Ensure popup bypass when Test Mode is enabled
     if st.session_state.test_mode:
         st.session_state.skip_api_key = True
+
+    # Load API keys from Streamlit secrets or environment into session state if not already set
+    # This allows hosted deployments to provide keys via Streamlit's secrets manager
+    if 'gemini_api_key' not in st.session_state or not st.session_state.get('gemini_api_key'):
+        gemini_secret = st.secrets.get('GEMINI_API_KEY') if hasattr(st, 'secrets') else None
+        env_gemini = os.getenv('GEMINI_API_KEY')
+        if gemini_secret:
+            st.session_state.gemini_api_key = gemini_secret
+        elif env_gemini:
+            st.session_state.gemini_api_key = env_gemini
+
+    if 'openweather_api_key' not in st.session_state or not st.session_state.get('openweather_api_key'):
+        weather_secret = st.secrets.get('OPENWEATHERMAP_API_KEY') if hasattr(st, 'secrets') else None
+        env_weather = os.getenv('OPENWEATHERMAP_API_KEY')
+        if weather_secret:
+            st.session_state.openweather_api_key = weather_secret
+        elif env_weather:
+            st.session_state.openweather_api_key = env_weather
     
     # Check for API keys (Gemini AI only)
     if (('gemini_api_key' not in st.session_state or 'openweather_api_key' not in st.session_state) and 
