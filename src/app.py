@@ -40,6 +40,16 @@ def main():
         st.session_state.env_data = None
     if 'ai_model_choice' not in st.session_state:
         st.session_state.ai_model_choice = "🌐 Web AI (Gemini)"
+    # Test Mode session defaults
+    if 'test_mode' not in st.session_state:
+        st.session_state.test_mode = False
+    if 'test_mode_uses' not in st.session_state:
+        st.session_state.test_mode_uses = 0
+    if 'test_mode_max_uses' not in st.session_state:
+        st.session_state.test_mode_max_uses = 5
+    # Ensure popup bypass when Test Mode is enabled
+    if st.session_state.test_mode:
+        st.session_state.skip_api_key = True
     
     # Check for API keys (Gemini AI only)
     if (('gemini_api_key' not in st.session_state or 'openweather_api_key' not in st.session_state) and 
@@ -300,9 +310,20 @@ def main():
         with col2:
             st.markdown("") # Spacer
             st.markdown("") # Spacer
-            if st.button("🚀 Get Plant Recommendations", type="primary", use_container_width=True):
+            # Test Mode usage info and button gating
+            tm_active = st.session_state.get('test_mode', False)
+            tm_uses = st.session_state.get('test_mode_uses', 0)
+            tm_max = st.session_state.get('test_mode_max_uses', 5)
+            uses_left = max(0, tm_max - tm_uses)
+            if tm_active:
+                st.info(f"🧪 Test Mode active — {uses_left} of {tm_max} runs left")
+            disabled_btn = tm_active and uses_left <= 0
+            if st.button("🚀 Get Plant Recommendations", type="primary", use_container_width=True, disabled=disabled_btn):
                 if goal_type:
-                    generate_recommendations_from_coords(lat, lon, goal_type, prefer_native)
+                    if disabled_btn:
+                        st.error("Test Mode limit reached. Please add your API keys to continue.")
+                    else:
+                        generate_recommendations_from_coords(lat, lon, goal_type, prefer_native)
                 else:
                     st.warning("Please select your goal first!")
         
@@ -333,6 +354,15 @@ def generate_recommendations_from_coords(lat, lon, goal_type, prefer_native):
     loading_placeholder = create_loading_animation()
     
     try:
+        # Enforce Test Mode limit (defense-in-depth)
+        if st.session_state.get('test_mode', False):
+            if st.session_state.get('test_mode_uses', 0) >= st.session_state.get('test_mode_max_uses', 5):
+                loading_placeholder.empty()
+                st.error("Test Mode limit reached. Add API keys or disable Test Mode to continue.")
+                return
+            # Count this generation attempt
+            st.session_state.test_mode_uses = st.session_state.get('test_mode_uses', 0) + 1
+
         show_loading_message(loading_placeholder, "Fetching environmental data...")
         
         # Get location name for display

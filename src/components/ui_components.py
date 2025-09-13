@@ -1,5 +1,6 @@
 import streamlit as st
 import re
+import os
 
 def show_api_key_popup():
     """
@@ -233,19 +234,39 @@ def show_api_key_popup():
                     st.error("❌ Please enter a valid Gemini API key")
                 elif not weather_valid:
                     st.error("❌ Please enter a valid OpenWeatherMap API key")
-        
         with col_b:
-            st.info("""
-            💡 **Important Notes:**
-            
-            🆓 Both API keys are **completely FREE**
-            
-            ⚡ **Gemini:** Ready immediately
-            
-            ⏰ **OpenWeatherMap:** Takes 10-120 minutes to activate after signup
-            
-            🔒 Your keys stay secure in your browser only
-            """)
+            if st.button("🧪 Enable Test Mode", use_container_width=True):
+                # Check for env-based keys (at least Gemini required)
+                env_gemini = os.getenv("GEMINI_API_KEY", "").strip()
+                env_weather = os.getenv("OPENWEATHERMAP_API_KEY", "").strip()
+                if not env_gemini:
+                    st.error("❌ Test Mode requires GEMINI_API_KEY in your .env file.")
+                else:
+                    # Activate test mode and bypass popup
+                    st.session_state.test_mode = True
+                    st.session_state.test_mode_uses = st.session_state.get('test_mode_uses', 0)
+                    st.session_state.test_mode_max_uses = 5
+                    # Ensure popup is skipped for this session
+                    st.session_state.skip_api_key = True
+                    # Do NOT store keys in session; APIs will read from environment
+                    st.success("✅ Test Mode enabled. You can explore the app without entering keys.")
+                    st.rerun()
+        
+        st.info("Test Mode is for evaluation only and capped at 5 recommendation generations.")
+        
+        st.info("""
+        💡 **Important Notes:**
+        
+        🆓 Both API keys are **completely FREE**
+        
+        ⚡ **Gemini:** Ready immediately
+        
+        ⏰ **OpenWeatherMap:** Takes 10-120 minutes to activate after signup
+        
+        🔒 Your keys stay secure in your browser only
+        """)
+
+        # Test Mode section
         
         # API Key Status Indicators
         if gemini_api_key and len(gemini_api_key.strip()) > 25:
@@ -265,7 +286,7 @@ def show_api_key_popup():
             <p>🌍 <strong>Why do I need API keys?</strong></p>
             <p>This app uses Google's Gemini AI to analyze your location's conditions and OpenWeatherMap 
             to get real-time weather, soil, and air quality data for accurate plant recommendations.</p>
-            <p1>🔒 <strong>Privacy:</strong> Your API keys stay in your browser and are never stored on our servers.</p1><br>
+            <p1>🔒 <strong>Privacy:</strong> Your API keys stay in your browser and are never stored on your servers.</p1><br>
             <p2> We do not store any personal information or API keys on our servers.</p2>
         </div>
         """, unsafe_allow_html=True)
@@ -313,32 +334,47 @@ def create_minimal_sidebar():
     st.sidebar.success("✅ Powered by Google Gemini")
     st.sidebar.info("Using Gemini 1.5 Flash for analysis")
     
-    # API Key Management
-    gemini_key_exists = 'gemini_api_key' in st.session_state and st.session_state.gemini_api_key
-    weather_key_exists = 'openweather_api_key' in st.session_state and st.session_state.openweather_api_key
-    
-    if gemini_key_exists and weather_key_exists:
-        st.sidebar.success("🔑 API Keys: Both Configured")
-        if st.sidebar.button("🔄 Change API Keys"):
-            if 'gemini_api_key' in st.session_state:
-                del st.session_state.gemini_api_key
-            if 'openweather_api_key' in st.session_state:
-                del st.session_state.openweather_api_key
-            st.rerun()
-    elif gemini_key_exists and not weather_key_exists:
-        st.sidebar.warning("⚠️ Gemini: ✅ | Weather: ❌")
-        if st.sidebar.button("🔑 Configure Weather API"):
-            st.rerun()
-    elif not gemini_key_exists and weather_key_exists:
-        st.sidebar.warning("⚠️ Gemini: ❌ | Weather: ✅")
-        if st.sidebar.button("🔑 Configure Gemini API"):
-            st.rerun()
-    else:
-        st.sidebar.error("❌ API Keys Required")
-        if st.sidebar.button("🔑 Configure API Keys"):
+    # API Key/Test Mode Management
+    if st.session_state.get('test_mode', False):
+        remaining = st.session_state.get('test_mode_max_uses', 5) - st.session_state.get('test_mode_uses', 0)
+        remaining = max(0, remaining)
+        st.sidebar.info(f"🧪 Test Mode: {remaining} of {st.session_state.get('test_mode_max_uses', 5)} uses remaining")
+        if remaining == 0:
+            st.sidebar.error("Test Mode limit reached. Add API keys to continue.")
+        if st.sidebar.button("🚪 Exit Test Mode"):
+            st.session_state.test_mode = False
+            st.session_state.test_mode_uses = 0
+            st.session_state.test_mode_max_uses = 5
+            # Allow popup again next run
             if 'skip_api_key' in st.session_state:
                 del st.session_state.skip_api_key
             st.rerun()
+    else:
+        gemini_key_exists = 'gemini_api_key' in st.session_state and st.session_state.gemini_api_key
+        weather_key_exists = 'openweather_api_key' in st.session_state and st.session_state.openweather_api_key
+        
+        if gemini_key_exists and weather_key_exists:
+            st.sidebar.success("🔑 API Keys: Both Configured")
+            if st.sidebar.button("🔄 Change API Keys"):
+                if 'gemini_api_key' in st.session_state:
+                    del st.session_state.gemini_api_key
+                if 'openweather_api_key' in st.session_state:
+                    del st.session_state.openweather_api_key
+                st.rerun()
+        elif gemini_key_exists and not weather_key_exists:
+            st.sidebar.warning("⚠️ Gemini: ✅ | Weather: ❌")
+            if st.sidebar.button("🔑 Configure Weather API"):
+                st.rerun()
+        elif not gemini_key_exists and weather_key_exists:
+            st.sidebar.warning("⚠️ Gemini: ❌ | Weather: ✅")
+            if st.sidebar.button("🔑 Configure Gemini API"):
+                st.rerun()
+        else:
+            st.sidebar.error("❌ API Keys Required")
+            if st.sidebar.button("🔑 Configure API Keys"):
+                if 'skip_api_key' in st.session_state:
+                    del st.session_state.skip_api_key
+                st.rerun()
     
     st.sidebar.markdown("---")
     st.sidebar.markdown("### 📍 Location Selection")
@@ -827,4 +863,3 @@ def create_download_summary(recommendations, env_data):
         summary += f"**Analysis:** {plant.get('suitability_analysis', 'N/A')}\n\n"
     
     return summary
-
