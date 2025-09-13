@@ -54,7 +54,11 @@ def main():
     # Load API keys from Streamlit secrets or environment into session state if not already set
     # This allows hosted deployments to provide keys via Streamlit's secrets manager
     if 'gemini_api_key' not in st.session_state or not st.session_state.get('gemini_api_key'):
-        gemini_secret = st.secrets.get('GEMINI_API_KEY') if hasattr(st, 'secrets') else None
+        gemini_secret = None
+        try:
+            gemini_secret = st.secrets["GEMINI_API_KEY"]  # May raise if secrets file missing
+        except Exception:
+            gemini_secret = None
         env_gemini = os.getenv('GEMINI_API_KEY')
         if gemini_secret:
             st.session_state.gemini_api_key = gemini_secret
@@ -62,19 +66,31 @@ def main():
             st.session_state.gemini_api_key = env_gemini
 
     if 'openweather_api_key' not in st.session_state or not st.session_state.get('openweather_api_key'):
-        weather_secret = st.secrets.get('OPENWEATHERMAP_API_KEY') if hasattr(st, 'secrets') else None
+        weather_secret = None
+        try:
+            weather_secret = st.secrets["OPENWEATHERMAP_API_KEY"]
+        except Exception:
+            weather_secret = None
         env_weather = os.getenv('OPENWEATHERMAP_API_KEY')
         if weather_secret:
             st.session_state.openweather_api_key = weather_secret
         elif env_weather:
             st.session_state.openweather_api_key = env_weather
     
-    # Check for API keys (Gemini AI only)
-    if (('gemini_api_key' not in st.session_state or 'openweather_api_key' not in st.session_state) and 
-        'skip_api_key' not in st.session_state):
+    # Auto-show the popup on first run so users see Test Mode/API options
+    if 'initial_popup_shown' not in st.session_state:
+        st.session_state.initial_popup_shown = False
+    if not st.session_state.initial_popup_shown:
+        st.session_state.force_show_api_popup = True
+        st.session_state.initial_popup_shown = True
+
+    # Check for API keys (Gemini AI only) or force showing the popup
+    force_show_popup = st.session_state.get('force_show_api_popup', False)
+    needs_popup = force_show_popup or (("gemini_api_key" not in st.session_state or 'openweather_api_key' not in st.session_state) and 'skip_api_key' not in st.session_state)
+    if needs_popup:
         # Show API key popup
         if not show_api_key_popup():
-            return  # Stop execution until API keys are provided
+            return  # Stop execution until API keys are provided or action taken
     
     # Create header (after session state is initialized)
     create_app_header()
