@@ -24,7 +24,7 @@ def main():
     """
     # Configure page
     st.set_page_config(
-        page_title="Crop & Afforestation AI Bot",
+        page_title="Crop Recommendation AI Bot",
         page_icon="🌱",
         layout="wide",
         initial_sidebar_state="expanded"
@@ -175,10 +175,10 @@ def main():
         with col1:
             # User goal selection with buttons
             st.markdown("### 🎯 What's your goal?")
-            st.markdown("Choose your primary objective for plantation:")
+            st.markdown("Choose your primary objective for crop cultivation:")
             
-            # Create goal selection buttons
-            goal_col1, goal_col2, goal_col3 = st.columns(3)
+            # Create goal selection buttons (2 columns for crop types only)
+            goal_col1, goal_col2 = st.columns(2)
             
             with goal_col1:
                 cash_crops = st.button(
@@ -189,15 +189,8 @@ def main():
             
             with goal_col2:
                 food_crops = st.button(
-                    "� Food Crops", 
+                    "🌾 Food Crops", 
                     help="Nutritious crops for food security and kitchen gardens",
-                    use_container_width=True
-                )
-            
-            with goal_col3:
-                afforestation = st.button(
-                    "🌳 Afforestation",
-                    help="Trees for air purification, shade, and environmental benefits",
                     use_container_width=True
                 )
             
@@ -210,9 +203,6 @@ def main():
             elif food_crops:
                 goal_type = "food_crops" 
                 st.session_state.selected_goal = "🌾 Food Crops"
-            elif afforestation:
-                goal_type = "afforestation"
-                st.session_state.selected_goal = "🌳 Afforestation"
             
             # Show selected goal
             if hasattr(st.session_state, 'selected_goal'):
@@ -223,8 +213,6 @@ def main():
                         goal_type = "cash_crops"
                     elif st.session_state.selected_goal == "🌾 Food Crops":
                         goal_type = "food_crops"
-                    elif st.session_state.selected_goal == "🌳 Afforestation":
-                        goal_type = "afforestation"
             
             prefer_native = st.checkbox(
                 "🌿 Prefer native Indian species",
@@ -449,8 +437,7 @@ def generate_recommendations_from_coords(lat, lon, goal_type, prefer_native):
         # Display success message with goal-specific text
         goal_text = {
             'cash_crops': 'high-value cash crops',
-            'food_crops': 'nutritious food crops', 
-            'afforestation': 'environmental trees'
+            'food_crops': 'nutritious food crops'
         }
         
         if recommendations and len(recommendations) > 0:
@@ -502,7 +489,7 @@ def display_sample_recommendations():
     st.markdown("*Here's what you can expect for different goals:*")
     
     # Create tabs for different goal types
-    sample_tab1, sample_tab2, sample_tab3 = st.tabs(["💰 Cash Crops", "🌾 Food Crops", "🌳 Afforestation"])
+    sample_tab1, sample_tab2 = st.tabs(["💰 Cash Crops", "🌾 Food Crops"])
     
     with sample_tab1:
         st.markdown("#### High-Value Commercial Crops")
@@ -556,33 +543,6 @@ def display_sample_recommendations():
             with st.expander(f"🌾 {i}. {plant['local_name']} - *{plant['scientific_name']}*"):
                 st.write(f"**Suitability:** {plant['suitability']}")
                 st.write(f"**Nutritional Benefits:** {plant['benefits']}")
-                st.write(f"**Care Tips:** {plant['care_tips']}")
-    
-    with sample_tab3:
-        st.markdown("#### Environmental Trees")
-        afforestation_samples = [
-            {
-                'scientific_name': 'Azadirachta indica',
-                'local_name': 'Neem (नीम)',
-                'suitability': 'Hardy tree perfect for urban environments with excellent pollution tolerance.',
-                'benefits': 'Natural air purifier, medicinal properties, and effective pest control.',
-                'care_tips': 'Water regularly in the first year, then minimal care needed. Prune annually.',
-                'plant_type': 'Tree'
-            },
-            {
-                'scientific_name': 'Moringa oleifera',
-                'local_name': 'Drumstick (सहजन)',
-                'suitability': 'Fast-growing tree that thrives in poor soil conditions.',
-                'benefits': 'Highly nutritious leaves and pods, medicinal uses, soil improvement.',
-                'care_tips': 'Minimal watering once established. Harvest regularly for best growth.',
-                'plant_type': 'Tree'
-            }
-        ]
-        
-        for i, plant in enumerate(afforestation_samples, 1):
-            with st.expander(f"🌳 {i}. {plant['local_name']} - *{plant['scientific_name']}*"):
-                st.write(f"**Suitability:** {plant['suitability']}")
-                st.write(f"**Environmental Benefits:** {plant['benefits']}")
                 st.write(f"**Care Tips:** {plant['care_tips']}")
 
 def display_info_panel():

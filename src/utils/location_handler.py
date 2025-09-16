@@ -60,7 +60,7 @@ def geocode_pin_code_with_headers(pin_code):
         
         url = "https://nominatim.openstreetmap.org/search"
         headers = {
-            'User-Agent': 'CropAfforestationBot/1.0 (educational-project)',
+            'User-Agent': 'CropRecommendationBot/1.0 (educational-project)',
             'Accept': 'application/json',
             'Accept-Language': 'en'
         }
@@ -100,7 +100,7 @@ def geocode_city_with_headers(city_name):
         
         url = "https://nominatim.openstreetmap.org/search"
         headers = {
-            'User-Agent': 'CropAfforestationBot/1.0 (educational-project)',
+            'User-Agent': 'CropRecommendationBot/1.0 (educational-project)',
             'Accept': 'application/json',
             'Accept-Language': 'en'
         }
@@ -259,7 +259,7 @@ def reverse_geocode_with_headers(lat, lon):
         
         # Proper headers required by Nominatim
         headers = {
-            'User-Agent': 'CropAfforestationBot/1.0 (educational-project)',
+            'User-Agent': 'CropRecommendationBot/1.0 (educational-project)',
             'Accept': 'application/json',
             'Accept-Language': 'en'
         }

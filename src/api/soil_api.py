@@ -52,7 +52,7 @@ def get_soilgrids_data(lat, lon):
         
         # Make API request with better headers
         headers = {
-            'User-Agent': 'CropAfforestationBot/1.0',
+            'User-Agent': 'CropRecommendationBot/1.0',
             'Accept': 'application/json'
         }
         

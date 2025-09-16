@@ -32,19 +32,9 @@ For FOOD CROPS in {region} focus on:
 • Seasonal rotation for continuous food production
 • Protein-rich legumes and vitamin-rich vegetables
 • Drought-tolerant and disease-resistant varieties
-        """,
-        'afforestation': f"""
-For AFFORESTATION in {region} focus on:
-• Fast-growing native trees for rapid environmental restoration
-• Species with excellent air purification and oxygen production
-• Trees providing shade, erosion control, and biodiversity support
-• Urban-suitable species with pollution tolerance
-• Multi-purpose trees (timber, fruit, medicinal, fodder)
-• Carbon sequestration potential and climate adaptation
-• Traditional agroforestry species integrated with farming
         """
     }
-    return instructions.get(goal_type, instructions['afforestation'])
+    return instructions.get(goal_type, instructions['food_crops'])
 
 def check_lm_studio_connection():
     """
@@ -84,7 +74,7 @@ def get_model_info(model_id: str):
         print(f"Error fetching model info: {e}")
         return None
 
-def get_recommendations(location_data, prefer_native=True, goal_type="afforestation", lat=20.5937, lon=78.9629):
+def get_recommendations(location_data, prefer_native=True, goal_type="food_crops", lat=20.5937, lon=78.9629):
     """
     Get comprehensive plant/crop recommendations from LM Studio local API with specific water/sunlight requirements
     """
@@ -104,10 +94,9 @@ def get_recommendations(location_data, prefer_native=True, goal_type="afforestat
         # Generate user goal from goal type
         goal_mapping = {
             'cash_crops': 'commercial cash crop cultivation for maximum economic returns',
-            'food_crops': 'food crop cultivation for nutrition and food security',
-            'afforestation': 'afforestation and tree plantation for environmental benefits'
+            'food_crops': 'food crop cultivation for nutrition and food security'
         }
-        user_goal = goal_mapping.get(goal_type, 'sustainable environmental plantation')
+        user_goal = goal_mapping.get(goal_type, 'sustainable crop cultivation')
         
         # Create a concise prompt optimized for local 3B models
         prompt = create_concise_local_prompt(location_data, user_goal, prefer_native, goal_type, lat, lon)
@@ -262,7 +251,7 @@ def create_error_response(error_message):
                                    'Check if the model is loaded in LM Studio']
     }]
 
-def create_concise_local_prompt(data, user_goal, prefer_native, goal_type="afforestation", lat=20.5937, lon=78.9629):
+def create_concise_local_prompt(data, user_goal, prefer_native, goal_type="food_crops", lat=20.5937, lon=78.9629):
     """
     Create a concise prompt optimized for local 3B models with specific water/sunlight requirements
     """

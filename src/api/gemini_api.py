@@ -51,21 +51,11 @@ For FOOD CROPS in {region} focus on:
 • Seasonal rotation for continuous food production
 • Protein-rich legumes and vitamin-rich vegetables
 • Drought-tolerant and disease-resistant varieties
-        """,
-        'afforestation': f"""
-For AFFORESTATION in {region} focus on:
-• Fast-growing native trees for rapid environmental restoration
-• Species with excellent air purification and oxygen production
-• Trees providing shade, erosion control, and biodiversity support
-• Urban-suitable species with pollution tolerance
-• Multi-purpose trees (timber, fruit, medicinal, fodder)
-• Carbon sequestration potential and climate adaptation
-• Traditional agroforestry species integrated with farming
         """
     }
-    return instructions.get(goal_type, instructions['afforestation'])
+    return instructions.get(goal_type, instructions['food_crops'])
 
-def get_recommendations(location_data, prefer_native=True, goal_type="afforestation", lat=20.5937, lon=78.9629):
+def get_recommendations(location_data, prefer_native=True, goal_type="food_crops", lat=20.5937, lon=78.9629):
     """
     Get comprehensive plant/crop recommendations from Gemini AI
     """
@@ -76,10 +66,9 @@ def get_recommendations(location_data, prefer_native=True, goal_type="afforestat
         # Generate user goal from goal type
         goal_mapping = {
             'cash_crops': 'commercial cash crop cultivation for maximum economic returns',
-            'food_crops': 'food crop cultivation for nutrition and food security',
-            'afforestation': 'afforestation and tree plantation for environmental benefits'
+            'food_crops': 'food crop cultivation for nutrition and food security'
         }
-        user_goal = goal_mapping.get(goal_type, 'sustainable environmental plantation')
+        user_goal = goal_mapping.get(goal_type, 'sustainable crop cultivation')
         
         # Create an enhanced, agentic prompt
         prompt = create_enhanced_recommendation_prompt(location_data, user_goal, prefer_native, goal_type, lat, lon)
@@ -141,7 +130,7 @@ def create_error_response(error_message):
         'sustainability_highlights': ['Please try again with different parameters']
     }]
 
-def create_enhanced_recommendation_prompt(data, user_goal, prefer_native, goal_type="afforestation", lat=20.5937, lon=78.9629):
+def create_enhanced_recommendation_prompt(data, user_goal, prefer_native, goal_type="food_crops", lat=20.5937, lon=78.9629):
     """
     Create an enhanced, agentic prompt for Gemini with comprehensive plant recommendations and specific measurements
     """

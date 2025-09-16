@@ -1,8 +1,8 @@
-# Crop & Afforestation Recommendation AI Bot
+# Crop Recommendation AI Bot
 
 ## Project Overview
 
-The Crop & Afforestation Recommendation AI Bot is a Streamlit-based Python application designed to provide intelligent recommendations for native crops and tree species suitable for urban afforestation and agriculture in India. By leveraging real-time environmental data, the bot aims to enhance biodiversity, pollution control, and sustainability in urban settings.
+The Crop Recommendation AI Bot is a Streamlit-based Python application designed to provide intelligent recommendations for crops suitable for agriculture in India. By leveraging real-time environmental data, the bot aims to enhance agricultural productivity, food security, and sustainable farming practices.
 
 ## Features
 
@@ -103,9 +103,9 @@ Open your web browser and navigate to `http://localhost:8501` to access the appl
 
 1. **Select AI Model**: Choose between Web AI (Gemini) or Local AI (LM Studio) in the sidebar
 2. **Choose Location**: Use the interactive map or enter PIN/city manually
-3. **Set Goals**: Select your objective (afforestation, food crops, or cash crops)
-4. **Get Recommendations**: Click generate to receive AI-powered plant suggestions
-5. **Follow Guides**: Implement the detailed plantation plans provided
+3. **Set Goals**: Select your objective (food crops or cash crops)
+4. **Get Recommendations**: Click generate to receive AI-powered crop suggestions
+5. **Follow Guides**: Implement the detailed cultivation plans provided
 
 ## API Keys
 

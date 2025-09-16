@@ -34,10 +34,10 @@ def show_api_key_popup():
         text-align: center;
     ">
         <h1 style="color: #2E7D32; margin-bottom: 20px; text-shadow: 0 2px 4px rgba(0,0,0,0.1);">
-            🌱 Welcome to Crop & Afforestation AI Bot
+            🌱 Welcome to Crop Recommendation AI Bot
         </h1>
         <p style="color: #555; font-size: 1.2rem; margin-bottom: 30px; line-height: 1.6;">
-            🔑 To get personalized plant recommendations, please enter your API keys.<br>
+            🔑 To get personalized crop recommendations, please enter your API keys.<br>
             <small style="color: #777;">Your API keys are securely stored only for this session and never shared.</small>
         </p>
     </div>

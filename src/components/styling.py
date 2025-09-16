@@ -251,8 +251,8 @@ def create_app_header():
     
     st.markdown(f"""
     <div class="main-header">
-        <h1>🌱 Crop & Afforestation AI Bot</h1>
-        <p>Get personalized plant recommendations for sustainable urban afforestation in India</p>
+        <h1>🌱 Crop Recommendation AI Bot</h1>
+        <p>Get personalized crop recommendations for sustainable agriculture in India</p>
         <div style="margin-top: 15px; display: flex; justify-content: center; gap: 20px; flex-wrap: wrap;">
             <div style="padding: 8px 16px; background: rgba(255,255,255,0.2); border-radius: 20px;">
                 <strong>AI Model: {ai_indicator}</strong>
