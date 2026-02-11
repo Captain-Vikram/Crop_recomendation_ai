@@ -11,10 +11,9 @@ from api.soil_api import get_soil_data
 from api.weather_api import get_weather_data
 from api.air_quality_api import get_air_quality_data
 from api.gemini_api import get_recommendations as get_gemini_recommendations
-from api.local_api import get_recommendations as get_local_recommendations, check_lm_studio_connection
 from utils.location_handler import get_lat_lon, validate_pin_code, get_location_name
 from utils.data_processor import format_data_for_ai, validate_environmental_data, get_data_quality_summary, create_environmental_summary
-from components.ui_components import create_minimal_sidebar, display_environmental_summary, display_recommendations, display_data_quality_info
+from components.ui_components import create_minimal_sidebar, display_environmental_summary, display_recommendations, display_data_quality_info, show_api_key_popup
 from components.styling import apply_custom_styles, create_app_header, create_loading_animation, show_loading_message, add_footer
 from components.map_interface import create_map_interface, get_location_from_map, create_location_summary
 from components.report_generator import create_comprehensive_report_download
@@ -25,7 +24,7 @@ def main():
     """
     # Configure page
     st.set_page_config(
-        page_title="Crop & Afforestation AI Bot",
+        page_title="Crop Recommendation AI Bot",
         page_icon="🌱",
         layout="wide",
         initial_sidebar_state="expanded"
@@ -41,6 +40,57 @@ def main():
         st.session_state.env_data = None
     if 'ai_model_choice' not in st.session_state:
         st.session_state.ai_model_choice = "🌐 Web AI (Gemini)"
+    # Test Mode session defaults
+    if 'test_mode' not in st.session_state:
+        st.session_state.test_mode = False
+    if 'test_mode_uses' not in st.session_state:
+        st.session_state.test_mode_uses = 0
+    if 'test_mode_max_uses' not in st.session_state:
+        st.session_state.test_mode_max_uses = 5
+    # Ensure popup bypass when Test Mode is enabled
+    if st.session_state.test_mode:
+        st.session_state.skip_api_key = True
+
+    # Load API keys from Streamlit secrets or environment into session state if not already set
+    # This allows hosted deployments to provide keys via Streamlit's secrets manager
+    if 'gemini_api_key' not in st.session_state or not st.session_state.get('gemini_api_key'):
+        gemini_secret = None
+        try:
+            gemini_secret = st.secrets["GEMINI_API_KEY"]  # May raise if secrets file missing
+        except Exception:
+            gemini_secret = None
+        env_gemini = os.getenv('GEMINI_API_KEY')
+        if gemini_secret:
+            st.session_state.gemini_api_key = gemini_secret
+        elif env_gemini:
+            st.session_state.gemini_api_key = env_gemini
+
+    if 'openweather_api_key' not in st.session_state or not st.session_state.get('openweather_api_key'):
+        weather_secret = None
+        try:
+            weather_secret = st.secrets["OPENWEATHERMAP_API_KEY"]
+        except Exception:
+            weather_secret = None
+        env_weather = os.getenv('OPENWEATHERMAP_API_KEY')
+        if weather_secret:
+            st.session_state.openweather_api_key = weather_secret
+        elif env_weather:
+            st.session_state.openweather_api_key = env_weather
+    
+    # Auto-show the popup on first run so users see Test Mode/API options
+    if 'initial_popup_shown' not in st.session_state:
+        st.session_state.initial_popup_shown = False
+    if not st.session_state.initial_popup_shown:
+        st.session_state.force_show_api_popup = True
+        st.session_state.initial_popup_shown = True
+
+    # Check for API keys (Gemini AI only) or force showing the popup
+    force_show_popup = st.session_state.get('force_show_api_popup', False)
+    needs_popup = force_show_popup or (("gemini_api_key" not in st.session_state or 'openweather_api_key' not in st.session_state) and 'skip_api_key' not in st.session_state)
+    if needs_popup:
+        # Show API key popup
+        if not show_api_key_popup():
+            return  # Stop execution until API keys are provided or action taken
     
     # Create header (after session state is initialized)
     create_app_header()
@@ -48,89 +98,9 @@ def main():
     # Create minimal sidebar
     create_minimal_sidebar()
     
-    # Prominent AI Model Selection Banner
-    st.markdown("""
-    <div style="
-        background: linear-gradient(90deg, #4CAF50 0%, #8BC34A 100%);
-        padding: 15px;
-        border-radius: 10px;
-        margin-bottom: 20px;
-        text-align: center;
-        color: white;
-    ">
-        <h3 style="margin: 0; color: white;">🤖 Choose Your AI Model</h3>
-    </div>
-    """, unsafe_allow_html=True)
-    
-    # Check if LM Studio is available
-    try:
-        lm_studio_available = check_lm_studio_connection()
-    except Exception as e:
-        lm_studio_available = False
-    
-    # Create AI selection columns
-    if lm_studio_available:
-        ai_col1, ai_col2 = st.columns(2)
-        
-        with ai_col1:
-            web_ai_selected = st.button(
-                "🌐 Web AI (Gemini)\n\nOnline • Comprehensive • Cloud-based",
-                key="web_ai_btn",
-                use_container_width=True,
-                help="Uses Google Gemini AI via internet connection"
-            )
-            if web_ai_selected:
-                st.session_state.ai_model_choice = "🌐 Web AI (Gemini)"
-                st.rerun()
-        
-        with ai_col2:
-            local_ai_selected = st.button(
-                "🏠 Local AI (LM Studio)\n\nPrivate • Offline • Local processing",
-                key="local_ai_btn", 
-                use_container_width=True,
-                help="Uses your local LM Studio model for complete privacy"
-            )
-            if local_ai_selected:
-                st.session_state.ai_model_choice = "🏠 Local AI (LM Studio)"
-                st.rerun()
-    else:
-        st.button(
-            "🌐 Web AI (Gemini)\n\nOnline • Comprehensive • Cloud-based",
-            key="web_ai_only_btn",
-            use_container_width=True,
-            disabled=False,
-            help="Uses Google Gemini AI via internet connection"
-        )
-        st.session_state.ai_model_choice = "🌐 Web AI (Gemini)"
-        
-        # Show local AI setup info
-        st.info("🏠 **Local AI not available.** To enable local AI, install and run LM Studio with a loaded model.")
-    
-    # Display current selection
-    current_ai = st.session_state.get('ai_model_choice', '🌐 Web AI (Gemini)')
-    
-    if "Local AI" in current_ai:
-        if lm_studio_available:
-            st.success(f"✅ **Currently using:** {current_ai}")
-            # Show model info
-            try:
-                from api.local_api import get_available_models
-                models = get_available_models()
-                if models:
-                    st.info(f"📦 **Active model:** {models[0]}")
-            except Exception:
-                pass
-        else:
-            st.error("❌ Local AI selected but LM Studio not available. Falling back to Web AI.")
-            st.session_state.ai_model_choice = "🌐 Web AI (Gemini)"
-    else:
-        st.success(f"✅ **Currently using:** {current_ai}")
-    
-    st.markdown("---")
-    
     # Main content area
     # Create location selection interface
-    st.markdown("## 🌍 Location Selection & Plant Recommendations")
+    st.markdown("## 🌍 Location Selection & Crop Recommendations")
     
     # Location input method selection
     input_method = st.radio(
@@ -196,38 +166,31 @@ def main():
         
         with col2:
             display_info_panel()
-    
+
     # Show recommendation generation if we have valid coordinates
     if lat and lon:
         st.markdown("---")
         col1, col2 = st.columns([3, 1])
-        
+
         with col1:
             # User goal selection with buttons
             st.markdown("### 🎯 What's your goal?")
-            st.markdown("Choose your primary objective for plantation:")
+            st.markdown("Choose your primary objective for cultivation:")
             
             # Create goal selection buttons
-            goal_col1, goal_col2, goal_col3 = st.columns(3)
-            
+            goal_col1, goal_col2 = st.columns(2)
+
             with goal_col1:
                 cash_crops = st.button(
                     "💰 Cash Crops",
                     help="High-value crops for commercial farming and income generation",
                     use_container_width=True
                 )
-            
+
             with goal_col2:
                 food_crops = st.button(
-                    "� Food Crops", 
+                    "🌾 Food Crops",
                     help="Nutritious crops for food security and kitchen gardens",
-                    use_container_width=True
-                )
-            
-            with goal_col3:
-                afforestation = st.button(
-                    "🌳 Afforestation",
-                    help="Trees for air purification, shade, and environmental benefits",
                     use_container_width=True
                 )
             
@@ -240,9 +203,7 @@ def main():
             elif food_crops:
                 goal_type = "food_crops" 
                 st.session_state.selected_goal = "🌾 Food Crops"
-            elif afforestation:
-                goal_type = "afforestation"
-                st.session_state.selected_goal = "🌳 Afforestation"
+            # Removed afforestation goal for crop-only UI
             
             # Show selected goal
             if hasattr(st.session_state, 'selected_goal'):
@@ -253,8 +214,7 @@ def main():
                         goal_type = "cash_crops"
                     elif st.session_state.selected_goal == "🌾 Food Crops":
                         goal_type = "food_crops"
-                    elif st.session_state.selected_goal == "🌳 Afforestation":
-                        goal_type = "afforestation"
+                    # Keep only crop goals
             
             prefer_native = st.checkbox(
                 "🌿 Prefer native Indian species",
@@ -370,13 +330,24 @@ def main():
                         prefs_summary.append(f"💰 Budget: {budget_preference}")
                     
                     st.caption(f"Custom settings: {' | '.join(prefs_summary)}")
-        
+
         with col2:
             st.markdown("") # Spacer
             st.markdown("") # Spacer
-            if st.button("🚀 Get Plant Recommendations", type="primary", use_container_width=True):
+            # Test Mode usage info and button gating
+            tm_active = st.session_state.get('test_mode', False)
+            tm_uses = st.session_state.get('test_mode_uses', 0)
+            tm_max = st.session_state.get('test_mode_max_uses', 5)
+            uses_left = max(0, tm_max - tm_uses)
+            if tm_active:
+                st.info(f"🧪 Test Mode active — {uses_left} of {tm_max} runs left")
+            disabled_btn = tm_active and uses_left <= 0
+            if st.button("🚀 Get Crop Recommendations", type="primary", use_container_width=True, disabled=disabled_btn):
                 if goal_type:
-                    generate_recommendations_from_coords(lat, lon, goal_type, prefer_native)
+                    if disabled_btn:
+                        st.error("Test Mode limit reached. Please add your API keys to continue.")
+                    else:
+                        generate_recommendations_from_coords(lat, lon, goal_type, prefer_native)
                 else:
                     st.warning("Please select your goal first!")
         
@@ -395,7 +366,7 @@ def main():
         else:
             st.info("🗺️ Please select a location on the map above to get personalized plant recommendations!")
             display_sample_recommendations()
-    
+
     # Add footer
     add_footer()
 
@@ -407,6 +378,15 @@ def generate_recommendations_from_coords(lat, lon, goal_type, prefer_native):
     loading_placeholder = create_loading_animation()
     
     try:
+        # Enforce Test Mode limit (defense-in-depth)
+        if st.session_state.get('test_mode', False):
+            if st.session_state.get('test_mode_uses', 0) >= st.session_state.get('test_mode_max_uses', 5):
+                loading_placeholder.empty()
+                st.error("Test Mode limit reached. Add API keys or disable Test Mode to continue.")
+                return
+            # Count this generation attempt
+            st.session_state.test_mode_uses = st.session_state.get('test_mode_uses', 0) + 1
+
         show_loading_message(loading_placeholder, "Fetching environmental data...")
         
         # Get location name for display
@@ -439,26 +419,15 @@ def generate_recommendations_from_coords(lat, lon, goal_type, prefer_native):
         # Update location name
         formatted_data['location'] = location_name or f"Location ({lat:.4f}, {lon:.4f})"
         
-        # Get AI recommendations with goal type and user preferences
-        ai_choice = st.session_state.get('ai_model_choice', '🌐 Web AI (Gemini)')
-        
-        with st.spinner(f"Generating AI-powered recommendations using {ai_choice}..."):
-            if "Local AI" in ai_choice:
-                recommendations = get_local_recommendations(
-                    formatted_data,
-                    prefer_native,
-                    goal_type=goal_type,
-                    lat=lat,
-                    lon=lon
-                )
-            else:
-                recommendations = get_gemini_recommendations(
-                    formatted_data,
-                    prefer_native,
-                    goal_type=goal_type,
-                    lat=lat,
-                    lon=lon
-                )
+        # Get AI recommendations with goal type and user preferences using Gemini
+        with st.spinner("Generating AI-powered recommendations using Gemini AI..."):
+            recommendations = get_gemini_recommendations(
+                formatted_data,
+                prefer_native,
+                goal_type=goal_type,
+                lat=lat,
+                lon=lon
+            )
         
         loading_placeholder.empty()
         
@@ -470,25 +439,26 @@ def generate_recommendations_from_coords(lat, lon, goal_type, prefer_native):
         # Display success message with goal-specific text
         goal_text = {
             'cash_crops': 'high-value cash crops',
-            'food_crops': 'nutritious food crops', 
-            'afforestation': 'environmental trees'
+            'food_crops': 'nutritious food crops'
         }
         
-        ai_model_name = "🏠 Local AI" if "Local AI" in ai_choice else "🌐 Web AI"
-        success_message = f"✅ Generated {len(recommendations)} {goal_text.get(goal_type, 'plant')} recommendations for {formatted_data['location']} using {ai_model_name}"
-        
-        # Add note about user preferences if they were used
-        if user_preferences and any([
-            user_preferences.get('water_availability', 'Auto-detect') != 'Auto-detect',
-            user_preferences.get('soil_type_input', '').strip(),
-            user_preferences.get('space_availability', 0) > 0,
-            user_preferences.get('area_with_units', '').strip(),
-            user_preferences.get('space_location_type', '').strip(),
-            user_preferences.get('budget_preference', 'Auto-suggest') != 'Auto-suggest'
-        ]):
-            success_message += " ⚙️ (customized with your preferences)"
-        
-        st.success(success_message)
+        if recommendations and len(recommendations) > 0:
+            success_message = f"✅ Generated {len(recommendations)} {goal_text.get(goal_type, 'plant')} recommendations for {formatted_data['location']} using Gemini AI"
+            
+            # Add note about user preferences if they were used
+            if user_preferences and any([
+                user_preferences.get('water_availability', 'Auto-detect') != 'Auto-detect',
+                user_preferences.get('soil_type_input', '').strip(),
+                user_preferences.get('space_availability', 0) > 0,
+                user_preferences.get('area_with_units', '').strip(),
+                user_preferences.get('space_location_type', '').strip(),
+                user_preferences.get('budget_preference', 'Auto-suggest') != 'Auto-suggest'
+            ]):
+                success_message += " ⚙️ (customized with your preferences)"
+            
+            st.success(success_message)
+        else:
+            st.warning("No recommendations were generated. Please try again with different parameters.")
         
     except Exception as e:
         loading_placeholder.empty()
@@ -521,7 +491,7 @@ def display_sample_recommendations():
     st.markdown("*Here's what you can expect for different goals:*")
     
     # Create tabs for different goal types
-    sample_tab1, sample_tab2, sample_tab3 = st.tabs(["💰 Cash Crops", "🌾 Food Crops", "🌳 Afforestation"])
+    sample_tab1, sample_tab2 = st.tabs(["💰 Cash Crops", "🌾 Food Crops"])
     
     with sample_tab1:
         st.markdown("#### High-Value Commercial Crops")
@@ -577,32 +547,7 @@ def display_sample_recommendations():
                 st.write(f"**Nutritional Benefits:** {plant['benefits']}")
                 st.write(f"**Care Tips:** {plant['care_tips']}")
     
-    with sample_tab3:
-        st.markdown("#### Environmental Trees")
-        afforestation_samples = [
-            {
-                'scientific_name': 'Azadirachta indica',
-                'local_name': 'Neem (नीम)',
-                'suitability': 'Hardy tree perfect for urban environments with excellent pollution tolerance.',
-                'benefits': 'Natural air purifier, medicinal properties, and effective pest control.',
-                'care_tips': 'Water regularly in the first year, then minimal care needed. Prune annually.',
-                'plant_type': 'Tree'
-            },
-            {
-                'scientific_name': 'Moringa oleifera',
-                'local_name': 'Drumstick (सहजन)',
-                'suitability': 'Fast-growing tree that thrives in poor soil conditions.',
-                'benefits': 'Highly nutritious leaves and pods, medicinal uses, soil improvement.',
-                'care_tips': 'Minimal watering once established. Harvest regularly for best growth.',
-                'plant_type': 'Tree'
-            }
-        ]
-        
-        for i, plant in enumerate(afforestation_samples, 1):
-            with st.expander(f"🌳 {i}. {plant['local_name']} - *{plant['scientific_name']}*"):
-                st.write(f"**Suitability:** {plant['suitability']}")
-                st.write(f"**Environmental Benefits:** {plant['benefits']}")
-                st.write(f"**Care Tips:** {plant['care_tips']}")
+    # Removed afforestation sample tab to keep the app crop-focused
 
 def display_info_panel():
     """

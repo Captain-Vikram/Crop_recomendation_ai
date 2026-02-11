@@ -1,8 +1,24 @@
 import requests
 import os
+import streamlit as st
 from dotenv import load_dotenv
 
 load_dotenv()
+
+def get_openweather_api_key():
+    """
+    Get OpenWeatherMap API key from session state or environment
+    """
+    # Try to get API key from session state first
+    api_key = None
+    if hasattr(st, 'session_state') and 'openweather_api_key' in st.session_state:
+        api_key = st.session_state.openweather_api_key
+    
+    # Fallback to environment variable
+    if not api_key:
+        api_key = os.getenv('OPENWEATHERMAP_API_KEY')
+    
+    return api_key
 
 def calculate_aqi_from_pm25(pm25_concentration):
     """
@@ -54,7 +70,7 @@ def get_weather_data(lat, lon):
     Fetch weather and air quality data from OpenWeatherMap
     Returns temperature, rainfall, humidity, and air pollution data
     """
-    api_key = os.getenv('OPENWEATHERMAP_API_KEY')
+    api_key = get_openweather_api_key()
     
     if not api_key:
         return get_default_weather_data()

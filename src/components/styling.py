@@ -232,12 +232,34 @@ def create_app_header():
     ai_choice = st.session_state.get('ai_model_choice', '🌐 Web AI (Gemini)')
     ai_indicator = "🏠 Local AI" if "Local AI" in ai_choice else "🌐 Web AI"
     
+    # Check API key status
+    api_key_status = ""
+    if "Web AI" in ai_choice:
+        gemini_key_exists = 'gemini_api_key' in st.session_state and st.session_state.gemini_api_key
+        weather_key_exists = 'openweather_api_key' in st.session_state and st.session_state.openweather_api_key
+        
+        if gemini_key_exists and weather_key_exists:
+            api_key_status = "✅ All API Keys Configured"
+        elif gemini_key_exists and not weather_key_exists:
+            api_key_status = "⚠️ Weather API Key Missing"
+        elif not gemini_key_exists and weather_key_exists:
+            api_key_status = "⚠️ Gemini API Key Missing"
+        else:
+            api_key_status = "❌ API Keys Required"
+    else:
+        api_key_status = "🔒 Private Mode"
+    
     st.markdown(f"""
     <div class="main-header">
-        <h1>🌱 Crop & Afforestation AI Bot</h1>
-        <p>Get personalized plant recommendations for sustainable urban afforestation in India</p>
-        <div style="margin-top: 10px; padding: 8px 16px; background: rgba(255,255,255,0.2); border-radius: 20px; display: inline-block;">
-            <strong>Current AI: {ai_indicator}</strong>
+        <h1>🌱 Crop Recommendation AI Bot</h1>
+        <p>Get personalized crop recommendations tailored to your local soil and climate</p>
+        <div style="margin-top: 15px; display: flex; justify-content: center; gap: 20px; flex-wrap: wrap;">
+            <div style="padding: 8px 16px; background: rgba(255,255,255,0.2); border-radius: 20px;">
+                <strong>AI Model: {ai_indicator}</strong>
+            </div>
+            <div style="padding: 8px 16px; background: rgba(255,255,255,0.2); border-radius: 20px;">
+                <strong>{api_key_status}</strong>
+            </div>
         </div>
     </div>
     """, unsafe_allow_html=True)

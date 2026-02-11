@@ -1,5 +1,319 @@
 import streamlit as st
 import re
+import os
+
+def show_api_key_popup():
+    """
+    Show API key input popup at application launch
+    Returns True if API keys are provided, False otherwise
+    """
+    # If user explicitly requested to show this popup, don't short-circuit
+    force_show = st.session_state.get('force_show_api_popup', False)
+    # Check if both API keys are already stored in session state
+    gemini_key_exists = 'gemini_api_key' in st.session_state and st.session_state.gemini_api_key
+    weather_key_exists = 'openweather_api_key' in st.session_state and st.session_state.openweather_api_key
+    
+    if not force_show:
+        if gemini_key_exists and weather_key_exists:
+            return True
+        
+        # Check if user chose to skip API key (local AI mode)
+        if 'skip_api_key' in st.session_state and st.session_state.skip_api_key:
+            return True
+    
+    # Create the popup content with better styling
+    st.markdown("""
+    <div style="
+        background: linear-gradient(135deg, #e8f5e8 0%, #f1f8e9 100%);
+        padding: 40px;
+        border-radius: 20px;
+        border: 3px solid #4CAF50;
+        box-shadow: 0 10px 30px rgba(76, 175, 80, 0.2);
+        max-width: 800px;
+        margin: 20px auto;
+        text-align: center;
+    ">
+        <h1 style="color: #2E7D32; margin-bottom: 20px; text-shadow: 0 2px 4px rgba(0,0,0,0.1);">
+            🌱 Welcome to Crop Recommendation AI Bot
+        </h1>
+        <p style="color: #555; font-size: 1.2rem; margin-bottom: 30px; line-height: 1.6;">
+            🔑 To get personalized plant recommendations, please enter your API keys.<br>
+            <small style="color: #777;">Your API keys are securely stored only for this session and never shared.</small>
+        </p>
+    </div>
+    """, unsafe_allow_html=True)
+    
+    # Create centered columns for the form
+    col1, col2, col3 = st.columns([1, 3, 1])
+    with col2:
+        # API key inputs with better styling
+        st.markdown("### 🔑 Enter Your API Keys")
+        
+        # Gemini API Key Input
+        st.markdown("#### 🤖 Gemini AI API Key")
+        gemini_api_key = st.text_input(
+            "Gemini API Key",
+            type="password",
+            placeholder="Paste your Gemini API key here... (e.g., AIzaSyA...)",
+            help="Get your free API key from Google AI Studio",
+            key="gemini_api_key_input",
+            label_visibility="collapsed",
+            value=st.session_state.get('gemini_api_key', '')
+        )
+        
+        # OpenWeatherMap API Key Input
+        st.markdown("#### 🌤️ OpenWeatherMap API Key")
+        weather_api_key = st.text_input(
+            "OpenWeatherMap API Key",
+            type="password",
+            placeholder="Paste your OpenWeatherMap API key here... (e.g., a1b2c3d4...)",
+            help="Get your free API key from OpenWeatherMap",
+            key="weather_api_key_input",
+            label_visibility="collapsed",
+            value=st.session_state.get('openweather_api_key', '')
+        )
+        
+        # Instructions for getting API keys
+        with st.expander("🤔 How to get FREE API keys?", expanded=False):
+            tab1, tab2 = st.tabs(["🤖 Gemini AI", "🌤️ OpenWeatherMap"])
+            
+            with tab1:
+                st.markdown("""
+                ### 🤖 Step-by-step guide for Gemini AI API:
+                
+                1. **Visit Google AI Studio** 
+                   👉 Go to [aistudio.google.com](https://aistudio.google.com/)
+                
+                2. **Sign in with Google**
+                   🔐 Use your existing Gmail/Google account
+                   📧 Or create a new Google account if needed
+                
+                3. **Accept Terms**
+                   📝 Accept the terms of service
+                   🌍 Select your country/region
+                
+                4. **Get API Key**
+                   🔑 Click "Get API key" in the left sidebar
+                   📋 Or click the "Create API key" button
+                   
+                5. **Create New Key**
+                   ➕ Click "Create API key in new project"
+                   🗂️ Or select an existing Google Cloud project
+                   ⚡ **Tip:** Creating in new project is easier!
+                   
+                6. **Copy Your Key**
+                   📋 Copy the generated key (starts with "AIza...")
+                   🔒 Keep it secure and paste it above
+                
+                **💰 Pricing:**
+                - ✅ **FREE tier:** Very generous limits
+                - 🔄 **No credit card** required to start
+                - 📊 **Perfect** for plant recommendations
+                
+                **🧠 What we use it for:**
+                - 🌱 Analyzing soil and climate data
+                - 🤖 Generating personalized plant recommendations
+                - 📖 Creating detailed care instructions
+                - 🌍 Environmental impact analysis
+                """)
+            
+            with tab2:
+                st.markdown("""
+                ### 🌤️ Step-by-step guide for OpenWeatherMap API:
+                
+                1. **Visit OpenWeatherMap Website** 
+                   👉 Go to [openweathermap.org](https://openweathermap.org/)
+                   
+                2. **Create Account**
+                   📝 Click "Sign Up" in the top right corner
+                   ✉️ Enter your email, username, and password
+                   📧 Verify your email address (check your inbox)
+                
+                3. **Sign In**
+                   🔐 Log in with your new account credentials
+                
+                4. **Access API Keys**
+                   🔑 Click on your username in the top right
+                   📋 Select "My API keys" from the dropdown menu
+                   
+                5. **Generate API Key**
+                   ➕ You'll see a default API key already created
+                   🆕 Or click "Generate" to create a new one
+                   📝 Give it a name like "Plant Recommendation App"
+                   
+                6. **Activate & Wait**
+                   ⏰ **Important:** New API keys take 10-120 minutes to activate
+                   ⚡ Test your key after waiting
+                   
+                7. **Copy Your Key**
+                   📋 Copy the API key (32 characters long)
+                   🔒 Keep it secure and paste it above
+                
+                **💰 Pricing:**
+                - ✅ **FREE tier:** 1,000 API calls/day
+                - ⚡ **Fast:** No credit card required
+                - 📊 **Perfect** for this plant recommendation app
+                
+                **🔍 What we use it for:**
+                - 🌡️ Real-time weather data
+                - 💨 Air quality information
+                - 🌧️ Rainfall patterns
+                - 🌍 Environmental conditions for your location
+                """)
+            
+            st.markdown("**🔒 Security:** Your API keys are only stored in your browser session and never shared.")
+        
+        # Troubleshooting section
+        with st.expander("🔧 Troubleshooting & Common Issues", expanded=False):
+            st.markdown("""
+            ### 🚨 Common Problems & Solutions:
+            
+            **🤖 Gemini API Issues:**
+            - ❌ **"Invalid API key"** → Check if you copied the complete key
+            - ❌ **"API not enabled"** → Make sure you're signed into the correct Google account
+            - ❌ **"Quota exceeded"** → You've hit the free tier limit (very rare)
+            
+            **🌤️ OpenWeatherMap API Issues:**
+            - ❌ **"Invalid API key"** → Your key might not be activated yet (wait 10-120 minutes)
+            - ❌ **"API key not found"** → Double-check you copied the key correctly
+            - ❌ **"Call limit exceeded"** → You've used 1000+ calls today (resets at midnight UTC)
+            
+            **🔧 General Tips:**
+            - 📋 **Copy-paste carefully** - avoid extra spaces or missing characters
+            - 🔄 **Refresh the page** if you keep getting errors
+            - ⏰ **Wait for activation** - OpenWeatherMap keys need time to activate
+            - 🌐 **Check internet connection** - APIs require stable internet
+            
+            **💬 Still having issues?**
+            Make sure both API keys are correctly formatted:
+            - Gemini keys start with "AIza" and are ~39 characters long
+            - OpenWeatherMap keys are exactly 32 characters long
+            """)
+        
+        # API Key Format Examples
+        with st.expander("📝 API Key Format Examples", expanded=False):
+            st.markdown("""
+            ### ✅ Correct API Key Formats:
+            
+            **🤖 Gemini API Key:**
+            ```
+            AIzaSyDaGmWKa4JsXZ5iQCDhcGM8vVfbJt9QWxY
+            ```
+            *(39 characters, starts with "AIza")*
+            
+            **🌤️ OpenWeatherMap API Key:**
+            ```
+            a1b2c3d4e5f6789012345678901234ab
+            ```
+            *(32 characters, mix of letters and numbers)*
+            
+            **❌ Common Mistakes:**
+            - Extra spaces at beginning or end
+            - Missing characters when copying
+            - Copying the wrong text from the website
+            - Using old/revoked keys
+            """)
+        
+        st.markdown("---")
+        
+        # Action buttons
+        col_a, col_b = st.columns(2)
+        with col_a:
+            if st.button("🚀 Continue with API Keys", use_container_width=True, type="primary"):
+                # Validate Gemini API key
+                gemini_valid = gemini_api_key and len(gemini_api_key.strip()) > 25
+                # Validate OpenWeatherMap API key (typically 32 characters)
+                weather_valid = weather_api_key and len(weather_api_key.strip()) > 20
+                
+                if gemini_valid and weather_valid:
+                    st.session_state.gemini_api_key = gemini_api_key.strip() if gemini_api_key else ""
+                    st.session_state.openweather_api_key = weather_api_key.strip() if weather_api_key else ""
+                    st.session_state.ai_model_choice = "🌐 Web AI (Gemini)"
+                    # Clear forced popup flag after successful save
+                    if 'force_show_api_popup' in st.session_state:
+                        st.session_state.force_show_api_popup = False
+                    st.success("✅ Both API keys saved successfully! Loading application...")
+                    st.rerun()
+                elif not gemini_valid and not weather_valid:
+                    st.error("❌ Please enter both valid API keys")
+                elif not gemini_valid:
+                    st.error("❌ Please enter a valid Gemini API key")
+                elif not weather_valid:
+                    st.error("❌ Please enter a valid OpenWeatherMap API key")
+        with col_b:
+            # Test Mode section (positioned next to Continue button, before info)
+            # col_tm1, col_tm2 = st.columns([1, 2])
+            if st.button("🧪 Enable Test Mode", use_container_width=True):
+                # Check for keys in Streamlit secrets first, then environment
+                gemini_secret = None
+                weather_secret = None
+                try:
+                    gemini_secret = st.secrets["GEMINI_API_KEY"]
+                except Exception:
+                    gemini_secret = None
+                try:
+                    weather_secret = st.secrets["OPENWEATHERMAP_API_KEY"]
+                except Exception:
+                    weather_secret = None
+                env_gemini = os.getenv("GEMINI_API_KEY", "").strip()
+                env_weather = os.getenv("OPENWEATHERMAP_API_KEY", "").strip()
+                # Prefer secrets > env
+                has_gemini = bool(gemini_secret) or bool(env_gemini)
+                if not has_gemini:
+                    st.error("❌ Test Mode requires GEMINI_API_KEY in Streamlit secrets or your .env file.")
+                else:
+                    # Activate test mode and bypass popup
+                    st.session_state.test_mode = True
+                    st.session_state.test_mode_uses = st.session_state.get('test_mode_uses', 0)
+                    st.session_state.test_mode_max_uses = 5
+                    # Ensure popup is skipped for this session
+                    st.session_state.skip_api_key = True
+                    # Do NOT store keys in session; APIs will read from environment
+                    # Clear forced popup flag
+                    if 'force_show_api_popup' in st.session_state:
+                        st.session_state.force_show_api_popup = False
+                    st.success("✅ Test Mode enabled. You can explore the app without entering keys.")
+                    st.rerun()
+        st.warning("Test Mode is for evaluation only and capped at 5 recommendation generations.")
+
+        st.info("""
+    💡 **Important Notes:**
+    
+    🆓 Both API keys are **completely FREE**
+    
+    ⚡ **Gemini:** Ready immediately
+    
+    ⏰ **OpenWeatherMap:** Takes 10-120 minutes to activate after signup
+    
+    🔒 Your keys stay secure in your browser only
+    """)
+
+        # Test Mode section
+        
+        # API Key Status Indicators
+        if gemini_api_key and len(gemini_api_key.strip()) > 25:
+            st.success("✅ Gemini API Key: Valid format")
+        elif gemini_api_key and len(gemini_api_key.strip()) > 10:
+            st.warning("⚠️ Gemini API Key: Seems short, please verify")
+            
+        if weather_api_key and len(weather_api_key.strip()) > 25:
+            st.success("✅ OpenWeatherMap API Key: Valid format")
+        elif weather_api_key and len(weather_api_key.strip()) > 10:
+            st.warning("⚠️ OpenWeatherMap API Key: Seems short, please verify")
+        
+        # Additional help section
+        st.markdown("---")
+        st.markdown("""
+        <div style="text-align: center; color: #666; font-size: 0.9rem;">
+            <p>🌍 <strong>Why do I need API keys?</strong></p>
+            <p>This app uses Google's Gemini AI to analyze your location's conditions and OpenWeatherMap 
+            to get real-time weather, soil, and air quality data for accurate plant recommendations.</p>
+            <p1>🔒 <strong>Privacy:</strong> Your API keys stay in your browser and are never stored on your servers.</p1><br>
+            <p2> We do not store any personal information or API keys on our servers.</p2>
+        </div>
+        """, unsafe_allow_html=True)
+    
+    return False
 
 def extract_number_from_text(text):
     """
@@ -37,67 +351,77 @@ def create_minimal_sidebar():
     """
     st.sidebar.title("🌱 Plant Recommendation AI")
     
-    # AI Model Selection
-    st.sidebar.markdown("### 🤖 AI Model Selection")
+    # AI Model Information
+    st.sidebar.markdown("### 🤖 AI Model")
+    st.sidebar.success("✅ Powered by Google Gemini")
+    st.sidebar.info("Using Gemini 1.5 Flash for analysis")
     
-    # Check if LM Studio is available
-    try:
-        from api.local_api import check_lm_studio_connection
-        lm_studio_available = check_lm_studio_connection()
-    except Exception:
-        lm_studio_available = False
-    
-    if lm_studio_available:
-        ai_options = ["🌐 Web AI (Gemini)", "🏠 Local AI (LM Studio)"]
-        ai_help = "Choose between online Gemini AI or your local LM Studio model"
+    # API Key/Test Mode Management
+    if st.session_state.get('test_mode', False):
+        remaining = st.session_state.get('test_mode_max_uses', 5) - st.session_state.get('test_mode_uses', 0)
+        remaining = max(0, remaining)
+        st.sidebar.info(f"🧪 Test Mode: {remaining} of {st.session_state.get('test_mode_max_uses', 5)} uses remaining")
+        if remaining == 0:
+            st.sidebar.error("Test Mode limit reached. Add API keys to continue.")
+        if st.sidebar.button("� Configure API / Test Mode"):
+            st.session_state.force_show_api_popup = True
+            st.rerun()
+        if st.sidebar.button("�🚪 Exit Test Mode"):
+            st.session_state.test_mode = False
+            st.session_state.test_mode_uses = 0
+            st.session_state.test_mode_max_uses = 5
+            # Allow popup again next run
+            if 'skip_api_key' in st.session_state:
+                del st.session_state.skip_api_key
+            st.rerun()
     else:
-        ai_options = ["🌐 Web AI (Gemini)"]
-        ai_help = "Local AI not available. Make sure LM Studio is running with a loaded model."
-    
-    ai_choice = st.sidebar.radio(
-        "Select AI Model:",
-        ai_options,
-        index=ai_options.index(st.session_state.get('ai_model_choice', ai_options[0])) if st.session_state.get('ai_model_choice', ai_options[0]) in ai_options else 0,
-        help=ai_help
-    )
-    
-    # Store AI choice in session state only if it actually changed
-    if st.session_state.get('ai_model_choice') != ai_choice:
-        st.session_state.ai_model_choice = ai_choice
-        # Clear previous recommendations when switching models
-        if 'recommendations' in st.session_state:
-            del st.session_state.recommendations
-        if 'env_data' in st.session_state:
-            del st.session_state.env_data
-    
-    # Show model status
-    if "Local AI" in ai_choice:
-        if lm_studio_available:
-            st.sidebar.success("✅ LM Studio Connected")
-            try:
-                from api.local_api import get_available_models
-                models = get_available_models()
-                if models:
-                    st.sidebar.info(f"📦 Models: {len(models)} available")
-                    # Show first few model names
-                    for model in models[:2]:
-                        st.sidebar.text(f"• {model[:30]}...")
-                else:
-                    st.sidebar.warning("⚠️ No models loaded")
-            except Exception as e:
-                st.sidebar.error(f"❌ Error: {e}")
+        gemini_key_exists = 'gemini_api_key' in st.session_state and st.session_state.gemini_api_key
+        weather_key_exists = 'openweather_api_key' in st.session_state and st.session_state.openweather_api_key
+        
+        if gemini_key_exists and weather_key_exists:
+            st.sidebar.success("🔑 API Keys: Both Configured")
+            if st.sidebar.button("� Configure API / Test Mode"):
+                st.session_state.force_show_api_popup = True
+                st.rerun()
+        elif gemini_key_exists and not weather_key_exists:
+            st.sidebar.warning("⚠️ Gemini: ✅ | Weather: ❌")
+            if st.sidebar.button("� Configure API / Test Mode"):
+                st.session_state.force_show_api_popup = True
+                st.rerun()
+        elif not gemini_key_exists and weather_key_exists:
+            st.sidebar.warning("⚠️ Gemini: ❌ | Weather: ✅")
+            if st.sidebar.button("� Configure API / Test Mode"):
+                st.session_state.force_show_api_popup = True
+                st.rerun()
         else:
-            st.sidebar.error("❌ LM Studio Not Available")
-            st.sidebar.markdown("""
-            **To use Local AI:**
-            1. Install LM Studio
-            2. Start the server: `lms server start`
-            3. Load a model (llama-3.2-3b-crop-recommender)
-            4. Ensure server runs on http://127.0.0.1:1234
-            """)
-    else:
-        st.sidebar.success("✅ Gemini AI Ready")
-        st.sidebar.info("Using Google Gemini 1.5 Flash")
+            st.sidebar.error("❌ API Keys Required")
+            if st.sidebar.button("� Configure API / Test Mode"):
+                st.session_state.force_show_api_popup = True
+                if 'skip_api_key' in st.session_state:
+                    del st.session_state.skip_api_key
+                st.rerun()
+
+        # Always-visible Test Mode quick toggle
+        st.sidebar.markdown("### 🧪 Test Mode (No Keys)")
+        st.sidebar.caption("Uses keys from Streamlit Secrets or .env. Limited to 5 runs.")
+        if st.sidebar.button("🧪 Enable Test Mode"):
+            # Check for keys in Streamlit secrets first, then environment
+            gemini_secret = None
+            try:
+                gemini_secret = st.secrets["GEMINI_API_KEY"]
+            except Exception:
+                gemini_secret = None
+            env_gemini = os.getenv("GEMINI_API_KEY", "").strip()
+            has_gemini = bool(gemini_secret) or bool(env_gemini)
+            if not has_gemini:
+                st.sidebar.error("GEMINI_API_KEY missing in secrets or .env")
+            else:
+                st.session_state.test_mode = True
+                st.session_state.test_mode_uses = st.session_state.get('test_mode_uses', 0)
+                st.session_state.test_mode_max_uses = 5
+                st.session_state.skip_api_key = True
+                st.session_state.force_show_api_popup = False
+                st.rerun()
     
     st.sidebar.markdown("---")
     st.sidebar.markdown("### 📍 Location Selection")
@@ -126,8 +450,6 @@ def create_minimal_sidebar():
         total_co2 = sum(extract_number_from_text(plant.get('air_quality_benefits', {}).get('co2_absorption', '25 kg')) for plant in recs)
         total_oxygen = sum(extract_number_from_text(plant.get('air_quality_benefits', {}).get('oxygen_production', '25 liters')) for plant in recs)
         
-        ai_model_used = "🏠 Local AI" if "Local AI" in st.session_state.get('ai_model_choice', '') else "🌐 Web AI"
-        
         st.sidebar.success(f"""
         **Your Selected Plants Will:**
         - Absorb {total_co2} kg CO2/year
@@ -135,13 +457,11 @@ def create_minimal_sidebar():
         - Improve local air quality
         - Support biodiversity
         
-        *Generated by {ai_model_used}*
+        *Generated by Gemini AI*
         """)
     
     return {
-        "minimal_sidebar": True, 
-        "ai_choice": ai_choice,
-        "lm_studio_available": lm_studio_available
+        "minimal_sidebar": True
     }
 
 def create_sidebar_inputs():
@@ -160,14 +480,14 @@ def display_environmental_summary(env_data, user_preferences=None):
     if user_preferences:
         preference_items = []
         if user_preferences.get('soil_type'):
-            preference_items.append(f"👤 Soil: {user_preferences['soil_type']}")
+            preference_items.append(f"🏔️ Soil: {user_preferences['soil_type']}")
         if user_preferences.get('water_availability'):
-            preference_items.append(f"👤 Water: {user_preferences['water_availability']}")
+            preference_items.append(f"💧 Water: {user_preferences['water_availability']}")
         if user_preferences.get('space_constraint'):
-            preference_items.append(f"👤 Space: {user_preferences['space_constraint']}")
+            preference_items.append(f"📐 Space: {user_preferences['space_constraint']}")
         
         if preference_items:
-            st.info(f"📋 Your Preferences: {' • '.join(preference_items)}")
+            st.info(f"🎯 **Your Preferences:** {' | '.join(preference_items)}")
     
     col1, col2 = st.columns(2)
     
@@ -183,7 +503,7 @@ def display_environmental_summary(env_data, user_preferences=None):
         rainfall_value = env_data.get('rainfall', 0)
         rainfall_help = "Annual rainfall estimate"
         if user_preferences and user_preferences.get('water_availability') in ['Limited', 'Abundant']:
-            rainfall_help += f" (👤 User preference: {user_preferences['water_availability']} water)"
+            rainfall_help += f" (adjusted for {user_preferences['water_availability']} water preference)"
         
         st.metric(
             "🌧️ Rainfall",
@@ -202,7 +522,7 @@ def display_environmental_summary(env_data, user_preferences=None):
         soil_ph = env_data.get('soil_ph', 6.5)
         soil_help = "Soil acidity/alkalinity"
         if user_preferences and user_preferences.get('soil_type'):
-            soil_help += f" (👤 User soil type: {user_preferences['soil_type']})"
+            soil_help += f" (considering your {user_preferences['soil_type']} soil)"
         
         st.metric(
             "🌱 Soil pH",
@@ -234,11 +554,11 @@ def display_environmental_summary(env_data, user_preferences=None):
     if user_preferences and user_preferences.get('space_constraint'):
         space_constraint = user_preferences['space_constraint']
         if space_constraint == 'Small (Terrace/Balcony)':
-            st.info("🏠 **Space Optimization:** Recommendations tailored for terrace/balcony planting")
+            st.info("📐 **Space Optimized:** Recommendations tailored for terrace/balcony gardens")
         elif space_constraint == 'Medium (Small Garden)':
-            st.info("🌿 **Garden Planning:** Recommendations for small garden spaces")
+            st.info("📐 **Space Optimized:** Recommendations for small garden spaces")
         elif space_constraint == 'Large (Farmland/Estate)':
-            st.info("🌳 **Large Scale:** Recommendations for extensive plantation projects")
+            st.info("📐 **Space Optimized:** Recommendations for large-scale plantation")
 
 def display_recommendations(recommendations):
     """
@@ -417,16 +737,8 @@ def display_plantation_guide_tab(plant):
     pw = plant.get('planting_window', {})
     if pw:
         st.markdown("**🗓️ Planting Window (AI):**")
-        best_months = pw.get('best_months') or []
-        st.write(f"Best months: {', '.join(best_months) if best_months else 'N/A'}")
-        can_now = pw.get('can_plant_now')
-        if isinstance(can_now, bool):
-            st.write(f"Can plant now: {'Yes' if can_now else 'No'}")
-        if not can_now:
-            st.markdown("**Why not now:**")
-            st.write(pw.get('planting_window_justification', 'Not suitable now based on seasonality'))
-            st.markdown("**Mitigation / Next best window:**")
-            st.write(pw.get('planting_mitigation_steps', 'Use container seedlings, mulching and supplemental irrigation.'))
+        st.write(f"Best months: {pw.get('best_months', 'Not specified')}")
+        st.write(f"Can plant now: {'✅ Yes' if pw.get('can_plant_now') else '❌ No'}")
     
     st.markdown("**🏗️ Soil Preparation:**")
     st.write(guide.get('soil_preparation', 'Prepare well-drained soil with organic matter'))
@@ -451,21 +763,17 @@ def display_watering_care_tab(plant):
     
     with col1:
         st.markdown("**🌱 Seedling Stage:**")
-        seed = water_req.get('seedling_stage') or watering.get('seedling_stage', 'Daily watering')
-        st.write(seed)
+        st.write(water_req.get('seedling_stage', watering.get('seedling', '2-3 liters/week')))
         
         st.markdown("**🌿 Young Plant:**")
-        young = water_req.get('young_plant') or watering.get('young_plant', 'Alternate day watering')
-        st.write(young)
+        st.write(water_req.get('young_plant', watering.get('young', '5-10 liters/week')))
     
     with col2:
         st.markdown("**🌳 Mature Plant:**")
-        mature = water_req.get('mature_plant') or watering.get('mature_plant', 'Weekly watering')
-        st.write(mature)
+        st.write(water_req.get('mature_plant', watering.get('mature', '15-25 liters/week')))
         
-        st.markdown("**💡 Water Conservation:**")
-        conv = water_req.get('water_conservation_methods') or watering.get('water_conservation_tips') or watering.get('water_conservation_methods') or 'Use mulching and efficient irrigation'
-        st.write(conv)
+        st.markdown("**🏜️ Dry Season Adjustment:**")
+        st.write(water_req.get('dry_season_adjustment', watering.get('dry_season', '+30% more water')))
 
     # Show sunlight requirements in care tab
     st.markdown("### 🌞 Sunlight Needs")
@@ -496,25 +804,36 @@ def display_growth_economics_tab(plant):
     col1, col2 = st.columns(2)
     
     with col1:
-        st.markdown(f"**🏗️ Mature Height:** {growth.get('mature_height', '5-10 meters')}")
-        st.markdown(f"**🌿 Spread:** {growth.get('mature_spread', '4-8 meters')}")
-        st.markdown(f"**⚡ Growth Rate:** {growth.get('growth_rate', 'Medium')}")
+        st.markdown("**📏 Mature Height:**")
+        st.write(growth.get('mature_height', '5-10 meters'))
+        
+        st.markdown("**🚀 Growth Rate:**")
+        st.write(growth.get('growth_rate', 'Medium'))
     
     with col2:
-        st.markdown(f"**⏰ Lifespan:** {growth.get('lifespan', '20-50 years')}")
-        st.markdown(f"**📏 Space Needed:** {growth.get('space_requirements', '3x3 meters')}")
+        st.markdown("**📐 Space Requirements:**")
+        st.write(growth.get('space_requirements', '2-3 meters spacing'))
+        
+        st.markdown("**⏳ Lifespan:**")
+        st.write(growth.get('lifespan', '20-50 years'))
     
     st.markdown("### 💰 Economic Analysis")
     
     col1, col2 = st.columns(2)
     
     with col1:
-        st.markdown(f"**💵 Initial Cost:** {economics.get('initial_cost', '₹200-500')}")
-        st.markdown(f"**🔄 Annual Maintenance:** {economics.get('maintenance_cost_annual', '₹300-800')}")
+        st.markdown("**💸 Initial Cost:**")
+        st.write(economics.get('initial_cost', '₹100-500 per plant'))
+        
+        st.markdown("**🔄 Annual Maintenance:**")
+        st.write(economics.get('maintenance_cost_annual', '₹50-200 per year'))
     
     with col2:
-        st.markdown(f"**💎 Property Value Impact:** {economics.get('property_value_impact', '5-15% increase')}")
-        st.markdown(f"**💰 Economic Returns:** {economics.get('economic_returns', 'Environmental benefits')}")
+        st.markdown("**💹 Economic Returns:**")
+        st.write(economics.get('economic_returns', 'Varies by plant type'))
+        
+        st.markdown("**🏠 Property Value Impact:**")
+        st.write(economics.get('property_value_impact', '2-5% increase'))
 
 def display_challenges_tab(plant):
     """Display challenges and solutions"""
@@ -557,19 +876,11 @@ def display_data_quality_info(quality_info):
     quality = quality_info.get('overall_quality', 'unknown')
     
     if quality == 'good':
-        st.success("✅ Using real-time environmental data")
+        st.success("✅ **Data Quality:** Excellent - All environmental data successfully retrieved")
     elif quality == 'fair':
-        st.warning("⚠️ Using partially estimated data")
-        with st.expander("Data Quality Details"):
-            for issue in quality_info.get('issues', []):
-                st.write(f"• {issue}")
+        st.warning("⚠️ **Data Quality:** Fair - Some data estimated, recommendations may be less precise")
     else:
-        st.info("ℹ️ Using default environmental data")
-        with st.expander("Data Quality Details"):
-            for issue in quality_info.get('issues', []):
-                st.write(f"• {issue}")
-            for rec in quality_info.get('recommendations', []):
-                st.write(f"💡 {rec}")
+        st.info("ℹ️ **Data Quality:** Using default estimates - Consider providing more specific location details")
 
 def create_download_summary(recommendations, env_data):
     """
@@ -591,11 +902,11 @@ def create_download_summary(recommendations, env_data):
     
     summary += "## Recommended Plants\n\n"
     for i, plant in enumerate(recommendations, 1):
-        summary += f"### {i}. {plant.get('scientific_name', 'Unknown')}\n"
+        summary += f"### {i}. {plant.get('common_name', 'Unknown Plant')}\n"
+        summary += f"**Scientific Name:** {plant.get('scientific_name', 'N/A')}\n"
         summary += f"**Local Name:** {plant.get('local_name', 'N/A')}\n"
         summary += f"**Type:** {plant.get('plant_type', 'Plant')}\n"
-        summary += f"**Suitability:** {plant.get('suitability', 'N/A')}\n"
-        summary += f"**Benefits:** {plant.get('benefits', 'N/A')}\n"
-        summary += f"**Care Tips:** {plant.get('care_tips', 'N/A')}\n\n"
+        summary += f"**Suitability:** {plant.get('suitability_score', 'N/A')}\n"
+        summary += f"**Analysis:** {plant.get('suitability_analysis', 'N/A')}\n\n"
     
     return summary
