@@ -46,9 +46,9 @@ For AFFORESTATION in {region} focus on:
     }
     return instructions.get(goal_type, instructions['afforestation'])
 
-def get_recommendations(location_data, prefer_native=True, goal_type="afforestation", lat=20.5937, lon=78.9629):
+def get_recommendations(location_data, prefer_native=True, goal_type="afforestation", lat=20.5937, lon=78.9629, model_version="gemini-2.0-flash"):
     """
-    Get comprehensive plant/crop recommendations from Gemini AI
+    Get comprehensive plant/crop recommendations from Gemini AI with quota fallback
     """
     try:
         # Generate user goal from goal type
@@ -62,8 +62,9 @@ def get_recommendations(location_data, prefer_native=True, goal_type="afforestat
         # Create an enhanced, agentic prompt
         prompt = create_enhanced_recommendation_prompt(location_data, user_goal, prefer_native, goal_type, lat, lon)
         
-        # Initialize Gemini model
-        model = genai.GenerativeModel('gemini-1.5-flash')
+        # Initialize Gemini model with selected version
+        print(f"📊 Using Gemini model: {model_version}")
+        model = genai.GenerativeModel(model_version)
         
         # Generate response with retry mechanism
         max_retries = 3
@@ -82,11 +83,37 @@ def get_recommendations(location_data, prefer_native=True, goal_type="afforestat
                     if attempt == max_retries - 1:
                         return create_error_response("Unable to generate valid recommendations after multiple attempts")
             except Exception as e:
+                error_str = f"{type(e).__name__} {str(e)} {repr(e)}"
+                
+                # Check for quota exceeded error (429)
+                if "429" in error_str or "quota" in error_str.lower() or "exceeded" in error_str.lower() or "ResourceExhausted" in error_str:
+                    print(f"\n⚠️ Gemini API quota exceeded!")
+                    print(f"Error: {str(e)[:200]}")
+                    # Return special error marker for fallback
+                    return [{
+                        'error': True,
+                        'quota_exceeded': True,
+                        'message': 'Gemini API quota exceeded. Falling back to Local AI...',
+                        'original_error': str(e)
+                    }]
+                
                 print(f"Attempt {attempt + 1} failed: {e}")
                 if attempt == max_retries - 1:
-                    return create_error_response(f"AI service error: {e}")
+                    return create_error_response(f"❌ AI service error: {e}")
         
     except Exception as e:
+        error_str = f"{type(e).__name__} {str(e)} {repr(e)}"
+        
+        # Check for quota error
+        if "429" in error_str or "quota" in error_str.lower() or "exceeded" in error_str.lower() or "ResourceExhausted" in error_str:
+            print(f"\n⚠️ Gemini API quota exceeded!")
+            return [{
+                'error': True,
+                'quota_exceeded': True,
+                'message': 'Gemini API quota exceeded. Falling back to Local AI...',
+                'original_error': str(e)
+            }]
+        
         print(f"Error getting recommendations: {e}")
         return create_error_response(f"System error: {e}")
 
