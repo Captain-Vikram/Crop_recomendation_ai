@@ -18,6 +18,7 @@ from components.ui_components import create_minimal_sidebar, display_environment
 from components.styling import apply_custom_styles, create_app_header, create_loading_animation, show_loading_message, add_footer
 from components.map_interface import create_map_interface, get_location_from_map, create_location_summary
 from components.report_generator import create_comprehensive_report_download
+from components.local_ai_manager import create_local_ai_selector, display_model_status, detect_and_display_available_models
 
 def main():
     """
@@ -41,6 +42,8 @@ def main():
         st.session_state.env_data = None
     if 'ai_model_choice' not in st.session_state:
         st.session_state.ai_model_choice = "🌐 Web AI (Gemini)"
+    if 'gemini_model_version' not in st.session_state:
+        st.session_state.gemini_model_version = "gemini-2.5-flash"
     
     # Create header (after session state is initialized)
     create_app_header()
@@ -48,85 +51,8 @@ def main():
     # Create minimal sidebar
     create_minimal_sidebar()
     
-    # Prominent AI Model Selection Banner
-    st.markdown("""
-    <div style="
-        background: linear-gradient(90deg, #4CAF50 0%, #8BC34A 100%);
-        padding: 15px;
-        border-radius: 10px;
-        margin-bottom: 20px;
-        text-align: center;
-        color: white;
-    ">
-        <h3 style="margin: 0; color: white;">🤖 Choose Your AI Model</h3>
-    </div>
-    """, unsafe_allow_html=True)
-    
-    # Check if LM Studio is available
-    try:
-        lm_studio_available = check_lm_studio_connection()
-    except Exception as e:
-        lm_studio_available = False
-    
-    # Create AI selection columns
-    if lm_studio_available:
-        ai_col1, ai_col2 = st.columns(2)
-        
-        with ai_col1:
-            web_ai_selected = st.button(
-                "🌐 Web AI (Gemini)\n\nOnline • Comprehensive • Cloud-based",
-                key="web_ai_btn",
-                use_container_width=True,
-                help="Uses Google Gemini AI via internet connection"
-            )
-            if web_ai_selected:
-                st.session_state.ai_model_choice = "🌐 Web AI (Gemini)"
-                st.rerun()
-        
-        with ai_col2:
-            local_ai_selected = st.button(
-                "🏠 Local AI (LM Studio)\n\nPrivate • Offline • Local processing",
-                key="local_ai_btn", 
-                use_container_width=True,
-                help="Uses your local LM Studio model for complete privacy"
-            )
-            if local_ai_selected:
-                st.session_state.ai_model_choice = "🏠 Local AI (LM Studio)"
-                st.rerun()
-    else:
-        st.button(
-            "🌐 Web AI (Gemini)\n\nOnline • Comprehensive • Cloud-based",
-            key="web_ai_only_btn",
-            use_container_width=True,
-            disabled=False,
-            help="Uses Google Gemini AI via internet connection"
-        )
-        st.session_state.ai_model_choice = "🌐 Web AI (Gemini)"
-        
-        # Show local AI setup info
-        st.info("🏠 **Local AI not available.** To enable local AI, install and run LM Studio with a loaded model.")
-    
-    # Display current selection
-    current_ai = st.session_state.get('ai_model_choice', '🌐 Web AI (Gemini)')
-    
-    if "Local AI" in current_ai:
-        if lm_studio_available:
-            st.success(f"✅ **Currently using:** {current_ai}")
-            # Show model info
-            try:
-                from api.local_api import get_available_models
-                models = get_available_models()
-                if models:
-                    st.info(f"📦 **Active model:** {models[0]}")
-            except Exception:
-                pass
-        else:
-            st.error("❌ Local AI selected but LM Studio not available. Falling back to Web AI.")
-            st.session_state.ai_model_choice = "🌐 Web AI (Gemini)"
-    else:
-        st.success(f"✅ **Currently using:** {current_ai}")
-    
-    st.markdown("---")
+    # Use the enhanced Local AI selector component
+    selected_ai, lm_studio_available = create_local_ai_selector()
     
     # Main content area
     # Create location selection interface
@@ -214,21 +140,21 @@ def main():
                 cash_crops = st.button(
                     "💰 Cash Crops",
                     help="High-value crops for commercial farming and income generation",
-                    use_container_width=True
+                    width='stretch'
                 )
             
             with goal_col2:
                 food_crops = st.button(
                     "� Food Crops", 
                     help="Nutritious crops for food security and kitchen gardens",
-                    use_container_width=True
+                    width='stretch'
                 )
             
             with goal_col3:
                 afforestation = st.button(
                     "🌳 Afforestation",
                     help="Trees for air purification, shade, and environmental benefits",
-                    use_container_width=True
+                    width='stretch'
                 )
             
             # Determine selected goal
@@ -374,7 +300,7 @@ def main():
         with col2:
             st.markdown("") # Spacer
             st.markdown("") # Spacer
-            if st.button("🚀 Get Plant Recommendations", type="primary", use_container_width=True):
+            if st.button("🚀 Get Plant Recommendations", type="primary", width='stretch'):
                 if goal_type:
                     generate_recommendations_from_coords(lat, lon, goal_type, prefer_native)
                 else:
@@ -457,15 +383,47 @@ def generate_recommendations_from_coords(lat, lon, goal_type, prefer_native):
                     prefer_native,
                     goal_type=goal_type,
                     lat=lat,
-                    lon=lon
+                    lon=lon,
+                    model_version=st.session_state.get('gemini_model_version', 'gemini-2.0-flash')
                 )
+                
+                # Check if Gemini quota was exceeded and fallback to Local AI
+                if recommendations and isinstance(recommendations, list) and len(recommendations) > 0:
+                    if recommendations[0].get('quota_exceeded'):
+                        print("\n🔄 Gemini quota exceeded - falling back to Local AI...")
+                        loading_placeholder.empty()
+                        
+                        # Check if Local AI is actually available before trying
+                        from api.local_api import check_lm_studio_connection
+                        if check_lm_studio_connection():
+                            st.warning("⚠️ Gemini API quota exceeded - switching to Local AI...")
+                            
+                            # Try to use Local AI instead
+                            with st.spinner("Generating recommendations using Local AI instead..."):
+                                recommendations = get_local_recommendations(
+                                    formatted_data,
+                                    prefer_native,
+                                    goal_type=goal_type,
+                                    lat=lat,
+                                    lon=lon
+                                )
+                            
+                            if recommendations and isinstance(recommendations, list) and len(recommendations) > 0 and not recommendations[0].get('error'):
+                                st.success("✅ Successfully generated recommendations using Local AI!")
+                                ai_choice = "🏠 Local AI (LM Studio)"
+                        else:
+                            # Local AI not available, keep the error but make it friendly
+                            st.error("⚠️ Gemini API quota exceeded and Local AI is not running!")
+                            st.info("💡 **To continue:** Start LM Studio with a model loaded, then try again.")
         
         loading_placeholder.empty()
         
         # Store results in session state
+        print(f"\n💾 Storing results: {len(recommendations) if recommendations else 0} recommendations")
         st.session_state.recommendations = recommendations
         st.session_state.env_data = formatted_data
         st.session_state.generation_date = datetime.now().strftime("%Y-%m-%d %H:%M")
+        print(f"✅ Session state updated. Recommendations in session: {len(st.session_state.recommendations) if st.session_state.recommendations else 0}")
         
         # Display success message with goal-specific text
         goal_text = {
@@ -475,7 +433,8 @@ def generate_recommendations_from_coords(lat, lon, goal_type, prefer_native):
         }
         
         ai_model_name = "🏠 Local AI" if "Local AI" in ai_choice else "🌐 Web AI"
-        success_message = f"✅ Generated {len(recommendations)} {goal_text.get(goal_type, 'plant')} recommendations for {formatted_data['location']} using {ai_model_name}"
+        rec_count = len(recommendations) if recommendations else 0
+        success_message = f"✅ Generated {rec_count} {goal_text.get(goal_type, 'plant')} recommendations for {formatted_data['location']} using {ai_model_name}"
         
         # Add note about user preferences if they were used
         if user_preferences and any([
@@ -490,6 +449,20 @@ def generate_recommendations_from_coords(lat, lon, goal_type, prefer_native):
         
         st.success(success_message)
         
+        # Show quota information if using fallback
+        if "Local AI" in ai_choice and 'ai_model_choice' in st.session_state:
+            if st.session_state.get('ai_model_choice') == '🌐 Web AI (Gemini)':
+                st.info("""
+                💡 **Gemini API Quota Limit Reached**
+                
+                Your free tier Gemini API quota has been exceeded. You have two options:
+                
+                1. **Use Local AI (Current)** - LM Studio provides unlimited local processing with no quota limits
+                2. **Upgrade Gemini Plan** - [Upgrade to a paid plan](https://ai.google.com/pricing) for higher quotas
+                
+                You can continue using Local AI, or upgrade your Google Cloud billing to use Gemini again.
+                """)
+        
     except Exception as e:
         loading_placeholder.empty()
         st.error(f"An error occurred: {str(e)}")
@@ -499,9 +472,26 @@ def display_results():
     """
     Display the generated recommendations and environmental data
     """
+    print("🎯 display_results() called")
+    
     env_data = st.session_state.env_data
     recommendations = st.session_state.recommendations
     user_preferences = st.session_state.get('user_preferences', {})
+    
+    print(f"📊 Display data: recommendations={len(recommendations) if recommendations else 0} items, env_data keys={list(env_data.keys()) if env_data else []}")
+    
+    if not recommendations:
+        print("⚠️ No recommendations to display!")
+        st.error("No recommendations were generated. Please try again.")
+        return
+    
+    if isinstance(recommendations, list) and len(recommendations) > 0:
+        if recommendations[0].get('error'):
+            print(f"⚠️ Error in recommendations: {recommendations[0].get('message')}")
+            st.error(f"❌ {recommendations[0].get('message')}")
+            return
+    
+    print(f"✅ Displaying {len(recommendations)} recommendations")
     
     # Display environmental summary with user preferences
     display_environmental_summary(env_data, user_preferences)
@@ -512,6 +502,7 @@ def display_results():
     
     # Display recommendations
     display_recommendations(recommendations)
+    print(f"✅ Successfully displayed all recommendations")
 
 def display_sample_recommendations():
     """
@@ -606,7 +597,7 @@ def display_sample_recommendations():
 
 def display_info_panel():
     """
-    Display information panel with tips and features
+    Display information panel with tips, features, and AI model information
     """
     st.markdown("### ℹ️ How It Works")
     
@@ -618,8 +609,31 @@ def display_info_panel():
         
         **Air Quality:** OpenWeatherMap Air Pollution API
         
-        **AI Engine:** Google Gemini Pro for intelligent recommendations
+        **AI Engine:** Smart recommendation system with dual AI options
         """)
+    
+    with st.expander("🤖 AI Model Information"):
+        from components.local_ai_manager import create_model_comparison_table, LocalAIManager
+        
+        manager = LocalAIManager()
+        current_ai = st.session_state.get('ai_model_choice', '🌐 Web AI (Gemini)')
+        
+        st.markdown("**Current AI Model:**")
+        st.info(f"Using: {current_ai}")
+        
+        if "Local AI" in current_ai and manager.check_connection():
+            models = manager.get_all_models()
+            if models:
+                active = manager.get_active_model()
+                if active:
+                    model_info = manager.get_model_info_display(active)
+                    st.markdown(f"**Model Type:** {model_info['type']}")
+                    if model_info['is_specialized']:
+                        st.success(f"✅ {model_info['description']}")
+        
+        st.markdown("---")
+        st.markdown("**AI Model Comparison:**")
+        create_model_comparison_table()
     
     with st.expander("🌱 Features"):
         st.write("""
@@ -629,11 +643,13 @@ def display_info_panel():
         
         ✅ Pollution-tolerant plant suggestions
         
-        ✅ Personalized care instructions
+        ✅ Personalized care instructions with specific water/sunlight amounts
         
-        ✅ Multiple location input methods
+        ✅ Multiple location input methods (map or manual)
         
-        ✅ Downloadable recommendations
+        ✅ Downloadable comprehensive reports
+        
+        ✅ Dual AI support (Cloud Gemini or Private Local AI)
         """)
     
     with st.expander("💡 Tips"):
@@ -643,6 +659,10 @@ def display_info_panel():
         📍 **Accurate Location:** Use precise PIN codes for better soil data
         
         🌿 **Native First:** Enable native species preference for better ecosystem support
+        
+        🤖 **Choose Your AI:** Use Local AI for privacy or Gemini for comprehensive analysis
+        
+        📊 **Customize:** Fill optional details for more accurate recommendations
         
         📱 **Mobile Friendly:** Works great on phones and tablets
         """)
@@ -663,6 +683,18 @@ def display_info_panel():
     - 3: Moderate
     - 4: Poor
     - 5: Very Poor
+    
+    **Specific Water Requirements:**
+    - Seedling: 5-15 liters per week
+    - Young Plant: 15-50 liters per week
+    - Mature: 25-150 liters per week
+    - Seasonal adjustments vary by plant type
+    
+    **Sunlight Requirements:**
+    - Full Sun: 6-8 hours daily
+    - Partial Sun: 4-6 hours daily
+    - Partial Shade: 2-4 hours daily
+    - Full Shade: <2 hours daily
     """)
 
 if __name__ == "__main__":

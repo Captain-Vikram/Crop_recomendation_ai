@@ -7,6 +7,7 @@ from typing import Dict, List, Any, Optional
 # LM Studio API Configuration
 LM_STUDIO_BASE_URL = "http://127.0.0.1:1234"
 MODEL_NAME = "llama-3.2-3b-crop-recommender"
+REQUEST_TIMEOUT = 180  # 3 minutes for local model generation (local 3B models are slower)
 
 def get_goal_specific_instructions(goal_type, region):
     """
@@ -117,25 +118,38 @@ def get_recommendations(location_data, prefer_native=True, goal_type="afforestat
         for attempt in range(max_retries):
             try:
                 response = generate_chat_completion(prompt, model_to_use)
+                print(f"\n🔄 Attempt {attempt + 1}/{max_retries}")
                 
                 if response and response.strip():
+                    print(f"📥 Got response of {len(response)} characters from local model")
                     # Parse the response into structured data
                     parsed_recommendations = parse_enhanced_local_response(response)
                     
+                    print(f"📤 Parsed result: {type(parsed_recommendations).__name__} with {len(parsed_recommendations) if parsed_recommendations else 0} items")
+                    
                     # Ensure we return a list of dictionaries with valid data
                     if isinstance(parsed_recommendations, list) and len(parsed_recommendations) > 0:
-                        return parsed_recommendations
+                        # Check if it's an error response
+                        if parsed_recommendations[0].get('error'):
+                            print(f"⚠️ Got error response: {parsed_recommendations[0].get('message')}")
+                            if attempt == max_retries - 1:
+                                return parsed_recommendations
+                        else:
+                            print(f"✅ Successfully got {len(parsed_recommendations)} valid recommendations on attempt {attempt + 1}")
+                            return parsed_recommendations
                     else:
-                        print(f"Attempt {attempt + 1}: No valid recommendations parsed from response")
+                        print(f"❌ Attempt {attempt + 1}: Parsed result is not a valid non-empty list")
                         if attempt == max_retries - 1:
                             return create_error_response("Unable to generate valid recommendations after multiple attempts")
                 else:
-                    print(f"Attempt {attempt + 1}: No response from local model")
+                    print(f"❌ Attempt {attempt + 1}: No response from local model")
                     if attempt == max_retries - 1:
                         return create_error_response("Local model not responding. Please check if LM Studio is running and the model is loaded.")
                     
             except Exception as e:
-                print(f"Attempt {attempt + 1} failed: {e}")
+                print(f"❌ Attempt {attempt + 1} failed with exception: {e}")
+                import traceback
+                traceback.print_exc()
                 if attempt == max_retries - 1:
                     return create_error_response(f"Local AI service error: {e}")
         
@@ -143,7 +157,7 @@ def get_recommendations(location_data, prefer_native=True, goal_type="afforestat
         print(f"Error getting recommendations: {e}")
         return create_error_response(f"System error: {e}")
 
-def generate_chat_completion(prompt: str, model: str, temperature: float = 0.7, max_tokens: int = 4096):
+def generate_chat_completion(prompt: str, model: str, temperature: float = 0.7, max_tokens: int = 3000):
     """
     Generate chat completion using LM Studio REST API
     """
@@ -154,13 +168,15 @@ def generate_chat_completion(prompt: str, model: str, temperature: float = 0.7, 
             print(f"Warning: Prompt too long ({len(prompt)} chars), truncating to {max_prompt_length}")
             prompt = prompt[:max_prompt_length] + "\n\nPlease provide 5 plant recommendations in JSON format with specific water amounts and sunlight hours."
         
+        print(f"📡 Sending request to LM Studio with {len(prompt)} char prompt, max_tokens={max_tokens}...")
+        
         # Prepare the request payload with conservative settings
         payload = {
             "model": model,
             "messages": [
                 {
                     "role": "system",
-                    "content": "You are an AI agricultural consultant. Provide plant recommendations for Indian climate in valid JSON format. Always include specific water amounts in liters and exact sunlight hours. Keep responses concise and under 4000 tokens. Always recommend exactly 5 plants."
+                    "content": "You are an AI agricultural consultant. Provide plant recommendations for Indian climate in valid JSON format. Always include specific water amounts in liters and exact sunlight hours. Keep responses concise and under 3000 tokens. Recommend exactly 4 plants with realistic water/sunlight requirements."
                 },
                 {
                     "role": "user",
@@ -175,12 +191,12 @@ def generate_chat_completion(prompt: str, model: str, temperature: float = 0.7, 
             "repeat_penalty": 1.1  # Prevent repetition
         }
         
-        # Make the API request with conservative timeout
+        # Make the API request with generous timeout for local model
         response = requests.post(
             f"{LM_STUDIO_BASE_URL}/v1/chat/completions",
             headers={"Content-Type": "application/json"},
             json=payload,
-            timeout=45  # Increased timeout to 45 seconds for complex requests
+            timeout=REQUEST_TIMEOUT  # Uses configurable REQUEST_TIMEOUT (180s for better reliability)
         )
         
         if response.status_code == 200:
@@ -191,14 +207,19 @@ def generate_chat_completion(prompt: str, model: str, temperature: float = 0.7, 
                 content = response_data['choices'][0]['message']['content']
                 
                 # Print stats if available
+                if 'usage' in response_data:
+                    usage = response_data['usage']
+                    print(f"📊 Token Usage - Prompt: {usage.get('prompt_tokens', 0)}, Completion: {usage.get('completion_tokens', 0)}, Total: {usage.get('total_tokens', 0)}")
+                
                 if 'stats' in response_data:
                     stats = response_data['stats']
-                    print(f"Local AI Stats - Tokens/sec: {stats.get('tokens_per_second', 0):.2f}, "
+                    print(f"⚡ Local AI Stats - Tokens/sec: {stats.get('tokens_per_second', 0):.2f}, "
                           f"Time to first token: {stats.get('time_to_first_token', 0):.3f}s")
                 
+                print(f"✅ Got response of {len(content)} characters from local model")
                 return content
             else:
-                print("No valid response choices from local model")
+                print("❌ No valid response choices from local model")
                 return None
         elif response.status_code == 400:
             error_msg = response.text
@@ -300,7 +321,7 @@ Air Quality: {data.get('aqi', 106)} AQI"""
             pref_text += " (Large scale planting, any size trees)"
 
     # Create concise prompt with specific water/sunlight requirements
-        prompt = f"""TASK: Recommend exactly 5 plants for {goal_type} in India.
+    prompt = f"""TASK: Recommend exactly 5 plants for {goal_type} in India.
 
 LOCATION DATA:
 {env_summary}
@@ -330,7 +351,7 @@ SEASONAL SUITABILITY & PLANTING WINDOW (CRITICAL):
     - "can_plant_now": true/false (boolean). If false, add a one-sentence "planting_window_justification" explaining why it's not recommended now and what climate/soil/season constraint prevents planting now.
     - If "can_plant_now" is false, include a short "planting_mitigation_steps" string that explains how to successfully establish the plant off-window (for example: use seedlings, shade nets, staggered watering, raised beds, or suggest the next best months to plant).
 
-Provide exactly 5 plant recommendations in this JSON format (do not include any extra text):
+Provide exactly 4 plant recommendations in this JSON format (do not include any extra text):
 [
     {{
         "common_name": "Plant Name",
@@ -373,6 +394,49 @@ CRITICAL: Use EXACT numeric amounts in liters and hours (e.g., "25 liters per we
     
     return prompt
 
+def attempt_partial_json_recovery(incomplete_json: str) -> str:
+    """Extract valid JSON from incomplete/truncated responses by finding last complete object."""
+    try:
+        # Count opening/closing braces
+        open_braces = incomplete_json.count('{')
+        close_braces = incomplete_json.count('}')
+        
+        if open_braces > close_braces:
+            # We have unclosed objects - find the last complete one
+            brace_count = 0
+            last_valid_idx = -1
+            in_string = False
+            escape = False
+            
+            for i, char in enumerate(incomplete_json):
+                # Handle string context to avoid counting braces inside strings
+                if char == '"' and not escape:
+                    in_string = not in_string
+                escape = (char == '\\' and not escape)
+                
+                if not in_string:
+                    if char == '{':
+                        brace_count += 1
+                    elif char == '}':
+                        brace_count -= 1
+                        if brace_count == 0:
+                            last_valid_idx = i
+            
+            if last_valid_idx > 0:
+                # Truncate to last complete object and close the array
+                recovered = incomplete_json[:last_valid_idx + 1] + ']'
+                print(f"🔧 Recovered partial JSON: keeping {incomplete_json[:last_valid_idx + 1].count('{') } complete objects")
+                return recovered
+        
+        # If still missing closing bracket, just add it
+        if not incomplete_json.rstrip().endswith(']'):
+            incomplete_json += ']'
+            
+        return incomplete_json
+    except Exception as e:
+        print(f"⚠️ Could not recover from incomplete JSON: {e}")
+        return incomplete_json
+
 def parse_enhanced_local_response(response_text):
     """
     Parse enhanced local AI response with ultra-robust JSON extraction and fixing
@@ -380,6 +444,7 @@ def parse_enhanced_local_response(response_text):
     try:
         # Clean the response text to handle markdown code blocks
         cleaned_text = response_text.strip()
+        print(f"📋 Raw response size: {len(cleaned_text)} characters")
         
         # Remove markdown code block markers if present
         if cleaned_text.startswith('```json'):
@@ -393,6 +458,7 @@ def parse_enhanced_local_response(response_text):
         
         # Try to find JSON array first (which is what the model actually returns)
         array_start = cleaned_text.find('[')
+        print(f"🔍 JSON array bracket found at position: {array_start}")
         
         if array_start != -1:
             # Find the matching closing bracket
@@ -408,28 +474,53 @@ def parse_enhanced_local_response(response_text):
                         end_idx = i + 1
                         break
             
+            print(f"📊 Bracket balance result: {bracket_count} (0=complete, >0=incomplete)")
+            
+            # Handle both complete and incomplete JSON arrays
             if bracket_count == 0:  # Found complete JSON array
                 json_str = cleaned_text[array_start:end_idx]
-                json_str = clean_json_string(json_str)
+                print(f"✅ Found complete JSON array ({len(json_str)} chars)")
+            else:  # Incomplete array - take what we have and close it
+                json_str = cleaned_text[array_start:]
+                print(f"⚠️ Incomplete JSON array detected ({len(json_str)} chars, {bracket_count} unclosed brackets)")
+                # Try to extract at least the first complete object
+                json_str = attempt_partial_json_recovery(json_str)
+                print(f"🔧 After recovery: {len(json_str)} chars")
+            
+            json_str = clean_json_string(json_str)
+            print(f"🧹 After cleaning: {len(json_str)} chars")
+            
+            try:
+                data = json.loads(json_str)
+                if isinstance(data, list) and len(data) > 0:
+                    # Normalize each recommendation's fields for UI compatibility
+                    for rec in data:
+                        normalize_recommendation_fields(rec)
+                    print(f"✅ Successfully parsed {len(data)} recommendations from local AI")
+                    return enhance_local_recommendations_for_ui(data)
+                else:
+                    print(f"⚠️ Parsed JSON but result is empty or not a list: {type(data)}")
+            except json.JSONDecodeError as e:
+                print(f"❌ JSON array parse error: {e} at position {getattr(e, 'pos', -1)}")
+                # Show a snippet of where the error occurred
+                error_pos = getattr(e, 'pos', 0)
+                if error_pos < len(json_str):
+                    snippet_start = max(0, error_pos - 50)
+                    snippet_end = min(len(json_str), error_pos + 50)
+                    error_context = json_str[snippet_start:snippet_end]
+                    print(f"📍 Error context: ...{error_context}...")
                 
+                # Try to fix and re-parse
+                json_str = fix_json_error(json_str, e)
                 try:
                     data = json.loads(json_str)
                     if isinstance(data, list) and len(data) > 0:
-                        # Normalize each recommendation's fields for UI compatibility
                         for rec in data:
                             normalize_recommendation_fields(rec)
-                        print(f"✅ Successfully parsed {len(data)} recommendations from local AI")
+                        print(f"✅ Successfully parsed {len(data)} after error fix")
                         return enhance_local_recommendations_for_ui(data)
-                except json.JSONDecodeError as e:
-                    print(f"JSON array parse error: {e}")
-                    # Try to fix and re-parse
-                    json_str = fix_json_error(json_str, e)
-                    try:
-                        data = json.loads(json_str)
-                        if isinstance(data, list) and len(data) > 0:
-                            return enhance_local_recommendations_for_ui(data)
-                    except:
-                        pass
+                except Exception as fix_error:
+                    print(f"❌ Still failed after fix: {fix_error}")
         
         # Fallback: Look for object structure (original logic)
         start_idx = cleaned_text.find('{')
@@ -462,12 +553,18 @@ def parse_enhanced_local_response(response_text):
                 except json.JSONDecodeError as e:
                     print(f"JSON object parse error: {e}")
         
-        print("No valid JSON structure found, extracting partial data...")
-        return extract_partial_recommendations(cleaned_text)
+        print("⚠️ No valid JSON structure found, extracting partial data...")
+        result = extract_partial_recommendations(cleaned_text)
+        print(f"📈 Partial extraction returned {len(result) if result else 0} items")
+        return result
             
     except Exception as e:
-        print(f"Critical parsing error: {e}")
-        return extract_partial_recommendations(response_text)
+        print(f"🔥 Critical parsing error: {e}")
+        import traceback
+        traceback.print_exc()
+        result = extract_partial_recommendations(response_text)
+        print(f"📈 Fallback extraction returned {len(result) if result else 0} items")
+        return result
 
 def clean_json_string(json_str):
     """Clean and normalize JSON string"""
